@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "tosfs"
+version = "0.1.0"
+description = "tosfs is a tos Python client that implements the fsspec interface."
+authors = ["Your Name <you@example.com>"]
+license = "Apache License"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+fsspec = ">=2023.5.0"
+tos = ">=2.7.0"
+
+[tool.poetry.group.dev.dependencies]
+fsspec = ">=2023.5.0"
+tos = ">=2.7.0"
+pylint = "==3.2.6"
+flake8 = "==7.0.0"
+black = "==24.4.1"
+isort = "==5.13.2"
+mypy = "==1.10.0"
+pytest = "==8.1.1"
+pytest-cov = "==5.0.0"
+coverage = "==7.5.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
