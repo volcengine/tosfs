@@ -12,6 +12,11 @@ fsspec = ">=2023.5.0"
 
 [tool.poetry.group.dev.dependencies]
 fsspec = ">=2023.5.0"
+pylint = "==3.2.6"
+flake8 = "==7.0.0"
+black = "==24.4.1"
+isort = "==5.13.2"
+mypy = "==1.10.0"
 
 [build-system]
 requires = ["poetry-core"]
