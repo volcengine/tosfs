@@ -1,5 +1,5 @@
 .ONESHELL:
-ENV_PREFIX=$(shell poetry env info -p)/bin/
+ENV_PREFIX=$(shell poetry env info -p 2>/dev/null || { [ -d "/home/runner/.local" ] && echo "/home/runner/.local"; })/bin/
 TEST_DIR?="tosfs/tests/"
 
 .PHONY: help
