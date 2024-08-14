@@ -12,32 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-The core module of TOSFS.
-"""
 import logging
 import os
 
-from fsspec.utils import setup_logging as setup_logger
-
-# environment variable names
-ENV_NAME_TOSFS_LOGGING_LEVEL = "TOSFS_LOGGING_LEVEL"
-
-logger = logging.getLogger("tosfs")
+from tosfs.core import ENV_NAME_TOSFS_LOGGING_LEVEL, setup_logging
 
 
-def setup_logging():
-    """
-    Set up the logging configuration for TOSFS.
-    """
-    setup_logger(
-        logger=logger,
-        level=os.environ.get(ENV_NAME_TOSFS_LOGGING_LEVEL, "INFO"),
-    )
+def test_logging_level_debug():
+    # Set the environment variable to DEBUG
+    os.environ[ENV_NAME_TOSFS_LOGGING_LEVEL] = "DEBUG"
 
+    # Re-setup logging to apply the new environment variable
+    setup_logging()
 
-setup_logging()
-
-logger.warning(
-    "The tosfs's log level is set to be %s", logging.getLevelName(logger.level)
-)
+    # Get the logger and check its level
+    logger = logging.getLogger("tosfs")
+    assert logger.level == logging.DEBUG
