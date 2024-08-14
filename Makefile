@@ -1,5 +1,5 @@
 .ONESHELL:
-ENV_PREFIX=$(shell poetry env info -p 2>/dev/null || { [ -d "/home/runner/.local" ] && echo "/home/runner/.local"; })/bin/
+ENV_PREFIX=$(shell poetry env info -p 2>/dev/null)/bin/
 TEST_DIR?="tosfs/tests/"
 
 .PHONY: help
@@ -28,9 +28,9 @@ show:             ## Show the current environment.
 
 .PHONY: install
 install:          ## Install the project in dev mode.
-	$(ENV_PREFIX)pip install poetry
-	$(ENV_PREFIX)poetry lock
-	$(ENV_PREFIX)poetry install --with dev
+	pip install poetry
+	poetry lock
+	poetry install --with dev
 
 .PHONY: fmt
 fmt:              ## Format code using black & isort.
@@ -49,7 +49,7 @@ lint:             ## Run pep8, black, mypy linters.
 
 .PHONY: test
 test:             ## Run tests and generate coverage report.
-	$(ENV_PREFIX)pytest -v -s --cov-config .coveragerc --cov=tosfs -l --tb=short --maxfail=1 ${TEST_DIR}
+	$(ENV_PREFIX)pytest -vv -s --cov-config .coveragerc --cov=tosfs -l --tb=short --maxfail=1 ${TEST_DIR}
 
 .PHONY: watch
 watch:            ## Run tests on every change.

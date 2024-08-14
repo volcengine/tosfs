@@ -20,5 +20,13 @@ jobs:
         python -m pip install --upgrade pip
         pip install --user poetry
         make install
-    - name: Check code style
+    - name: Prepare Env
+      run: |
+        echo "Preparing environment variables"
+        echo "TOS_ACCESS_KEY=${{ secrets.TOS_ACCESS_KEY }}" >> $GITHUB_ENV
+        echo "TOS_SECRET_KEY=${{ secrets.TOS_SECRET_KEY }}" >> $GITHUB_ENV
+        echo "TOS_REGION=${{ vars.TOS_REGION }}" >> $GITHUB_ENV
+        echo "TOS_ENDPOINT=${{ vars.TOS_ENDPOINT }}" >> $GITHUB_ENV
+        echo "TOSFS_LOGGING_LEVEL=${{ vars.TOSFS_LOGGING_LEVEL }}" >> $GITHUB_ENV
+    - name: Run tests
       run: make test
