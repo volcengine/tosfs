@@ -11,17 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import os
 
 import pytest
 from tos import EnvCredentialsProvider
 
 from tosfs.core import TosFileSystem
-
-test_bucket_name = "proton-ci"
-secure_bucket_name = "test-secure"
-versioned_bucket_name = "test-versioned"
 
 
 @pytest.fixture(scope="module")
@@ -46,8 +41,16 @@ def tosfs(tosfs_env_prepare):
     yield tosfs
 
 
-def test_ls(tosfs):
-    assert test_bucket_name in set(tosfs.ls("", detail=False))
-    assert (
-        tosfs.ls("nonexistent") == []
-    ), "Nonexistent path should return empty list"
+@pytest.mark.parametrize(
+    "input_str, expected_output",
+    [
+        ("bucket/key", ("bucket", "key")),
+        ("bucket/", ("bucket", "")),
+        ("/key", ("", "key")),
+        ("bucket/key/with/slashes", ("bucket", "key/with/slashes")),
+        ("bucket", ("bucket", "")),
+        ("", ("", "")),
+    ],
+)
+def test_find_bucket_key(tosfs, input_str, expected_output):
+    assert tosfs._find_bucket_key(input_str) == expected_output
