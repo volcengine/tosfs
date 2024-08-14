@@ -11,20 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-import logging
-import os
-
-from tosfs.core import ENV_NAME_TOSFS_LOGGING_LEVEL, setup_logging
+"""
+This module contains exceptions definition for the tosfs package.
+"""
 
 
-def test_logging_level_debug():
-    # Set the environment variable to DEBUG
-    os.environ[ENV_NAME_TOSFS_LOGGING_LEVEL] = "DEBUG"
+class TosfsError(Exception):
+    """
+    Base class for all tosfs exceptions.
+    """
 
-    # Re-setup logging to apply the new environment variable
-    setup_logging()
-
-    # Get the logger and check its level
-    logger = logging.getLogger("tosfs")
-    assert logger.level == logging.DEBUG
+    def __init__(self, message: str):
+        super().__init__(message)

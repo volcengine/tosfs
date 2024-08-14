@@ -12,19 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
-import os
+import pytest
 
-from tosfs.core import ENV_NAME_TOSFS_LOGGING_LEVEL, setup_logging
+from tosfs.utils import find_bucket_key
 
 
-def test_logging_level_debug():
-    # Set the environment variable to DEBUG
-    os.environ[ENV_NAME_TOSFS_LOGGING_LEVEL] = "DEBUG"
-
-    # Re-setup logging to apply the new environment variable
-    setup_logging()
-
-    # Get the logger and check its level
-    logger = logging.getLogger("tosfs")
-    assert logger.level == logging.DEBUG
+@pytest.mark.parametrize(
+    "input_str, expected_output",
+    [
+        ("bucket/key", ("bucket", "key")),
+        ("bucket/", ("bucket", "")),
+        ("/key", ("", "key")),
+        ("bucket/key/with/slashes", ("bucket", "key/with/slashes")),
+        ("bucket", ("bucket", "")),
+        ("", ("", "")),
+    ],
+)
+def test_find_bucket_key(tosfs, input_str, expected_output):
+    assert find_bucket_key(input_str) == expected_output
