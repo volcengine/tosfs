@@ -14,11 +14,12 @@
 
 import pytest
 
+from tosfs.core import TosFileSystem
 from tosfs.utils import find_bucket_key
 
 
 @pytest.mark.parametrize(
-    "input_str, expected_output",
+    ("input_str", "expected_output"),
     [
         ("bucket/key", ("bucket", "key")),
         ("bucket/", ("bucket", "")),
@@ -28,5 +29,7 @@ from tosfs.utils import find_bucket_key
         ("", ("", "")),
     ],
 )
-def test_find_bucket_key(tosfs, input_str, expected_output):
+def test_find_bucket_key(
+    tosfs: TosFileSystem, input_str: str, expected_output: str
+) -> None:
     assert find_bucket_key(input_str) == expected_output

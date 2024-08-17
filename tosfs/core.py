@@ -12,18 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-The core module of TOSFS.
-"""
+"""The core module of TOSFS."""
 import logging
 import os
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import tos
 from fsspec import AbstractFileSystem
 from fsspec.utils import setup_logging as setup_logger
 from tos.models import CommonPrefixInfo
-from tos.models2 import ListedObjectVersion
+from tos.models2 import ListedObject, ListedObjectVersion
 
 from tosfs.exceptions import TosfsError
 from tosfs.utils import find_bucket_key
@@ -34,10 +32,8 @@ ENV_NAME_TOSFS_LOGGING_LEVEL = "TOSFS_LOGGING_LEVEL"
 logger = logging.getLogger("tosfs")
 
 
-def setup_logging():
-    """
-    Set up the logging configuration for TOSFS.
-    """
+def setup_logging() -> None:
+    """Set up the logging configuration for TOSFS."""
     setup_logger(
         logger=logger,
         level=os.environ.get(ENV_NAME_TOSFS_LOGGING_LEVEL, "INFO"),
@@ -52,21 +48,23 @@ logger.warning(
 
 
 class TosFileSystem(AbstractFileSystem):
-    """
-    Tos file system. An implementation of AbstractFileSystem which is an
+    """Tos file system.
+
+    It's an implementation of AbstractFileSystem which is an
     abstract super-class for pythonic file-systems.
     """
 
     def __init__(
         self,
-        endpoint_url=None,
-        key="",
-        secret="",
-        region=None,
-        version_aware=False,
-        credentials_provider=None,
-        **kwargs,
-    ):
+        endpoint_url: Optional[str] = None,
+        key: str = "",
+        secret: str = "",
+        region: Optional[str] = None,
+        version_aware: bool = False,
+        credentials_provider: Optional[object] = None,
+        **kwargs: Union[str, bool, float, None],
+    ) -> None:
+        """Initialise the TosFileSystem."""
         self.tos_client = tos.TosClientV2(
             key,
             secret,
@@ -77,9 +75,16 @@ class TosFileSystem(AbstractFileSystem):
         self.version_aware = version_aware
         super().__init__(**kwargs)
 
-    def ls(self, path, detail=False, refresh=False, versions=False, **kwargs):
-        """
-        List objects under the given path.
+    def ls(
+        self,
+        path: str,
+        detail: bool = False,
+        refresh: bool = False,
+        versions: bool = False,
+        **kwargs: Union[str, bool, float, None],
+    ) -> Union[List[dict], List[str]]:
+        """List objects under the given path.
+
         :param path: The path to list.
         :param detail: Whether to return detailed information.
         :param refresh: Whether to refresh the cache.
@@ -108,9 +113,9 @@ class TosFileSystem(AbstractFileSystem):
 
         return files if detail else sorted([o["name"] for o in files])
 
-    def _lsbuckets(self, refresh=False):
-        """
-        List all buckets in the account.
+    def _lsbuckets(self, refresh: bool = False) -> List[dict]:
+        """List all buckets in the account.
+
         :param refresh: Whether to refresh the cache.
         :return: A list of buckets.
         """
@@ -125,40 +130,37 @@ class TosFileSystem(AbstractFileSystem):
                 raise e
             except Exception as e:
                 logger.error("Tosfs failed with unknown error: %s", e)
-                raise TosfsError(
-                    f"Tosfs failed with unknown error: {e}"
-                ) from e
+                raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
 
-            buckets = []
-            for bucket in resp.buckets:
-                buckets.append(
-                    {
-                        "Key": bucket.name,
-                        "Size": 0,
-                        "StorageClass": "BUCKET",
-                        "size": 0,
-                        "type": "directory",
-                        "name": bucket.name,
-                    }
-                )
+            buckets = [
+                {
+                    "Key": bucket.name,
+                    "Size": 0,
+                    "StorageClass": "BUCKET",
+                    "size": 0,
+                    "type": "directory",
+                    "name": bucket.name,
+                }
+                for bucket in resp.buckets
+            ]
             self.dircache[""] = buckets
 
         return self.dircache[""]
 
     def _lsdir(
         self,
-        path,
-        refresh=False,
+        path: str,
+        refresh: bool = False,
         max_items: int = 1000,
-        delimiter="/",
-        prefix="",
-        versions=False,
-    ):
-        """
-        List objects in a bucket, here we use cache to improve performance.
+        delimiter: str = "/",
+        prefix: str = "",
+        versions: bool = False,
+    ) -> List[Union[CommonPrefixInfo, ListedObject, ListedObjectVersion]]:
+        """List objects in a bucket, here we use cache to improve performance.
+
         :param path: The path to list.
         :param refresh: Whether to refresh the cache.
-        :param max_items: The maximum number of items to return, default is 1000.  # noqa: E501
+        :param max_items: The maximum number of items to return, default is 1000.
         :param delimiter: The delimiter to use for grouping objects.
         :param prefix: The prefix to use for filtering objects.
         :param versions: Whether to list object versions.
@@ -193,16 +195,16 @@ class TosFileSystem(AbstractFileSystem):
 
     def _listdir(
         self,
-        bucket,
+        bucket: str,
         max_items: int = 1000,
-        delimiter="/",
-        prefix="",
-        versions=False,
-    ):
-        """
-        List objects in a bucket.
+        delimiter: str = "/",
+        prefix: str = "",
+        versions: bool = False,
+    ) -> List[Union[CommonPrefixInfo, ListedObject, ListedObjectVersion]]:
+        """List objects in a bucket.
+
         :param bucket: The bucket name.
-        :param max_items: The maximum number of items to return, default is 1000.  # noqa: E501
+        :param max_items: The maximum number of items to return, default is 1000.
         :param delimiter: The delimiter to use for grouping objects.
         :param prefix: The prefix to use for filtering objects.
         :param versions: Whether to list object versions.
@@ -231,9 +233,7 @@ class TosFileSystem(AbstractFileSystem):
                     )
                     is_truncated = resp.is_truncated
                     all_results.extend(
-                        resp.versions
-                        + resp.common_prefixes
-                        + resp.delete_markers
+                        resp.versions + resp.common_prefixes + resp.delete_markers
                     )
                     key_marker, version_id_marker = (
                         resp.next_key_marker,
@@ -270,9 +270,8 @@ class TosFileSystem(AbstractFileSystem):
             logger.error("Tosfs failed with unknown error: %s", e)
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
 
-    def _split_path(self, path) -> Tuple[str, str, Optional[str]]:
-        """
-        Normalise tos path string into bucket and key.
+    def _split_path(self, path: str) -> Tuple[str, str, Optional[str]]:
+        """Normalise tos path string into bucket and key.
 
         Parameters
         ----------
@@ -284,8 +283,9 @@ class TosFileSystem(AbstractFileSystem):
         >>> split_path("tos://mybucket/path/to/file")
         ['mybucket', 'path/to/file', None]
         # pylint: disable=line-too-long
-        >>> split_path("tos://mybucket/path/to/versioned_file?versionId=some_version_id")  # noqa: E501
+        >>> split_path("tos://mybucket/path/to/versioned_file?versionId=some_version_id")
         ['mybucket', 'path/to/versioned_file', 'some_version_id']
+
         """
         path = self._strip_protocol(path)
         path = path.lstrip("/")
@@ -301,7 +301,7 @@ class TosFileSystem(AbstractFileSystem):
         )
 
     @staticmethod
-    def _fill_common_prefix_info(common_prefix: CommonPrefixInfo, bucket):
+    def _fill_common_prefix_info(common_prefix: CommonPrefixInfo, bucket: str) -> dict:
         return {
             "name": common_prefix.prefix[:-1],
             "Key": "/".join([bucket, common_prefix.prefix]),
@@ -310,7 +310,9 @@ class TosFileSystem(AbstractFileSystem):
         }
 
     @staticmethod
-    def _fill_object_info(obj, bucket, versions=False):
+    def _fill_object_info(
+        obj: ListedObject, bucket: str, versions: bool = False
+    ) -> dict:
         result = {
             "Key": f"{bucket}/{obj.key}",
             "size": obj.size,

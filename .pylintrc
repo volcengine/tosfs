@@ -1,6 +1,0 @@
-[MESSAGES CONTROL]
-# disable these rules:
-# R0913: Too many arguments (used when a function or method has too many arguments).
-# W0718: Exception raised is not an instance of BaseException.
-# W0223: Method 'method' is abstract in class 'class' but is not overridden.
-disable=R0913,W0718,W0223

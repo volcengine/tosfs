@@ -12,45 +12,45 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-This module contains utility functions for the tosfs package.
-"""
+"""The module contains utility functions for the tosfs package."""
 
 import random
 import re
 import string
+from typing import Tuple
 
 
 def random_path(length: int = 5) -> str:
-    """
-    Generate a random path(dir or file) of the given length.
+    """Generate a random path(dir or file) of the given length.
 
     Args:
-        length (int): The length of the random string.
+    ----
+    length (int): The length of the random string.
 
     Returns:
-        str: The random string.
+    -------
+    str: The random string.
+
     """
-    return "".join(
-        random.choices(string.ascii_letters + string.digits, k=length)
-    )
+    return "".join(random.choices(string.ascii_letters + string.digits, k=length))
 
 
-def find_bucket_key(tos_path):
-    """
-    This is a helper function that given an tos path such that the path
-    is of the form: bucket/key
-    It will return the bucket and the key represented by the tos path
+def find_bucket_key(tos_path: str) -> Tuple[str, str]:
+    """It's a helper function to find bucket and key pair.
+
+    It receives a tos path such that the path
+    is of the form: bucket/key.
+    It will return the bucket and the key represented by the tos path.
     """
     bucket_format_list = [
         re.compile(
-            r"^(?P<bucket>:tos:[a-z\-0-9]*:[0-9]{12}:accesspoint[:/][^/]+)/?"  # noqa: E501
+            r"^(?P<bucket>:tos:[a-z\-0-9]*:[0-9]{12}:accesspoint[:/][^/]+)/?"
             r"(?P<key>.*)$"
         ),
         re.compile(
             r"^(?P<bucket>:tos-outposts:[a-z\-0-9]+:[0-9]{12}:outpost[/:]"
             # pylint: disable=line-too-long
-            r"[a-zA-Z0-9\-]{1,63}[/:](bucket|accesspoint)[/:][a-zA-Z0-9\-]{1,63})[/:]?(?P<key>.*)$"  # noqa: E501
+            r"[a-zA-Z0-9\-]{1,63}[/:](bucket|accesspoint)[/:][a-zA-Z0-9\-]{1,63})[/:]?(?P<key>.*)$"
         ),
         re.compile(
             r"^(?P<bucket>:tos-outposts:[a-z\-0-9]+:[0-9]{12}:outpost[/:]"

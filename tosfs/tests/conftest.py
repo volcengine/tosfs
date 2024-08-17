@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+from typing import Generator
 
 import pytest
 from tos import EnvCredentialsProvider
@@ -22,34 +23,32 @@ from tosfs.utils import random_path
 
 
 @pytest.fixture(scope="module")
-def tosfs_env_prepare():
+def _tosfs_env_prepare() -> None:
     if "TOS_ACCESS_KEY" not in os.environ:
-        raise EnvironmentError(
-            "Can not find TOS_ACCESS_KEY in environment variables."
-        )
+        raise EnvironmentError("Can not find TOS_ACCESS_KEY in environment variables.")
     if "TOS_SECRET_KEY" not in os.environ:
-        raise EnvironmentError(
-            "Can not find TOS_SECRET_KEY in environment variables."
-        )
+        raise EnvironmentError("Can not find TOS_SECRET_KEY in environment variables.")
 
 
 @pytest.fixture(scope="module")
-def tosfs(tosfs_env_prepare):
+def tosfs(_tosfs_env_prepare: None) -> TosFileSystem:
     tosfs = TosFileSystem(
         endpoint_url=os.environ.get("TOS_ENDPOINT"),
         region=os.environ.get("TOS_REGION"),
         credentials_provider=EnvCredentialsProvider(),
     )
-    yield tosfs
+    return tosfs
 
 
 @pytest.fixture(scope="module")
-def bucket():
-    yield os.environ.get("TOS_BUCKET", "proton-ci")
+def bucket() -> str:
+    return os.environ.get("TOS_BUCKET", "proton-ci")
 
 
 @pytest.fixture(autouse=True)
-def temporary_workspace(tosfs, bucket):
+def temporary_workspace(
+    tosfs: TosFileSystem, bucket: str
+) -> Generator[str, None, None]:
     workspace = random_path()
     # currently, make dir via purely tos python client,
     # will replace with tosfs.mkdir in the future

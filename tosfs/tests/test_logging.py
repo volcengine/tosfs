@@ -18,7 +18,7 @@ import os
 from tosfs.core import ENV_NAME_TOSFS_LOGGING_LEVEL, setup_logging
 
 
-def test_logging_level_debug():
+def test_logging_level_debug() -> None:
     # Set the environment variable to DEBUG
     os.environ[ENV_NAME_TOSFS_LOGGING_LEVEL] = "DEBUG"
 
