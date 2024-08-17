@@ -34,17 +34,15 @@ install:          ## Install the project in dev mode.
 
 .PHONY: fmt
 fmt:              ## Format code using black & isort.
+	poetry run ruff check tosfs/ --fix
 	$(ENV_PREFIX)isort tosfs/
-	$(ENV_PREFIX)black -l 79 tosfs/
-	$(ENV_PREFIX)black -l 79 tosfs/tests/
+	$(ENV_PREFIX)black -l 88 tosfs/
 
 .PHONY: lint
 lint:             ## Run pep8, black, mypy linters.
 	set -e;
-	$(ENV_PREFIX)pylint tosfs/
-	$(ENV_PREFIX)flake8 tosfs/
-	$(ENV_PREFIX)black -l 79 --check tosfs/
-	$(ENV_PREFIX)black -l 79 --check tosfs/tests/
+	$(ENV_PREFIX)black -l 88 --check tosfs/
+	poetry run ruff check tosfs/
 	$(ENV_PREFIX)mypy --ignore-missing-imports tosfs/
 
 .PHONY: test

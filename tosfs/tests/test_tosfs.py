@@ -17,8 +17,10 @@ from unittest.mock import MagicMock
 import pytest
 from tos.exceptions import TosServerError
 
+from tosfs.core import TosFileSystem
 
-def test_ls_bucket(tosfs, bucket):
+
+def test_ls_bucket(tosfs: TosFileSystem, bucket: str) -> None:
     assert bucket in tosfs.ls("", detail=False)
     detailed_list = tosfs.ls("", detail=True)
     assert detailed_list
@@ -31,7 +33,7 @@ def test_ls_bucket(tosfs, bucket):
         tosfs.ls("nonexistent", detail=False)
 
 
-def test_ls_dir(tosfs, bucket, temporary_workspace):
+def test_ls_dir(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
     assert temporary_workspace in tosfs.ls(bucket, detail=False)
     detailed_list = tosfs.ls(bucket, detail=True)
     assert detailed_list
@@ -40,18 +42,15 @@ def test_ls_dir(tosfs, bucket, temporary_workspace):
             assert item["type"] == "directory"
             break
     else:
-        assert (
-            False
-        ), f"Directory {temporary_workspace} not found in {detailed_list}"
+        raise AssertionError(
+            f"Directory {temporary_workspace} not found in {detailed_list}"
+        )
 
     assert tosfs.ls(f"{bucket}/{temporary_workspace}", detail=False) == []
-    assert (
-        tosfs.ls(f"{bucket}/{temporary_workspace}/nonexistent", detail=False)
-        == []
-    )
+    assert tosfs.ls(f"{bucket}/{temporary_workspace}/nonexistent", detail=False) == []
 
 
-def test_ls_cache(tosfs, bucket):
+def test_ls_cache(tosfs: TosFileSystem, bucket: str) -> None:
     tosfs.tos_client.list_objects_type2 = MagicMock(
         return_value=MagicMock(
             is_truncated=False,

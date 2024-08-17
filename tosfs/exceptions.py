@@ -11,15 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""
-This module contains exceptions definition for the tosfs package.
-"""
+"""iT contains exceptions definition for the tosfs package."""
 
 
 class TosfsError(Exception):
-    """
-    Base class for all tosfs exceptions.
-    """
+    """Base class for all tosfs exceptions."""
 
     def __init__(self, message: str):
+        """Initialize the base class for all exceptions in the tosfs package."""
         super().__init__(message)

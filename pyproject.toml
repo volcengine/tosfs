@@ -14,14 +14,82 @@ tos = ">=2.7.0"
 [tool.poetry.group.dev.dependencies]
 fsspec = ">=2023.5.0"
 tos = ">=2.7.0"
-pylint = "==3.2.6"
-flake8 = "==7.0.0"
 black = "==24.4.1"
 isort = "==5.13.2"
 mypy = "==1.10.0"
 pytest = "==8.1.1"
 pytest-cov = "==5.0.0"
 coverage = "==7.5.0"
+ruff = "==0.6.0"
+
+[tool.pydocstyle]
+convention = "numpy"
+
+[tool.ruff]
+target-version = "py39"
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+    "A",        # Annotations rules
+    "ASYNC",    # Asynchronous programming rules
+    "B",        # Bugbear rules
+    "C",        # Complexity rules
+    "D",        # Docstring rules
+    "E",        # Error rules
+    "F",        # Pyflakes rules
+    "FURB",     # FURB rules
+    "G",        # General rules
+    "I",        # Import rules
+    "LOG",      # Logging rules
+    "N",        # Naming rules
+    "PERF",     # Performance rules
+    "PIE",      # PIE rules
+    "PLC",      # Pylint convention rules
+    "PLE",      # Pylint error rules
+    "PLR",      # Pylint refactor rules
+    "PLW",      # Pylint warning rules
+    "PT",       # Pytest rules
+    "PYI",      # Pyright rules
+    "Q",        # Quotes rules
+    "RUF",      # Ruff-specific rules
+    "S",        # Security rules
+    "SIM",      # Similarity rules
+    "SLOT",     # Slot rules
+    "T",        # Testing rules
+    "W",        # Whitespace rules
+    "YTT",      # YTT rules
+]
+ignore = [
+    "S101", # Use of `assert` detected
+    "S311", # Standard pseudo-random generators are not suitable for cryptographic purposes
+    "D203", # no-blank-line-before-class
+    "D213", # multi-line-summary-second-line
+    "PLR0913", # Too many arguments in function definition
+    "SIM105", # Use `contextlib.suppress(IOError)` instead of `try`-`except`-`pass`
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tosfs/tests/*" = [
+    #D103 Missing docstring in public function
+    "D103",
+    #D100 Missing docstring in public module
+    "D100"
+]
+"tosfs/__init__.py" = [
+    #D104 Missing docstring in public package
+    "D104",
+    #D107 Missing docstring in __init__
+    "D107"
+]
+
+[tool.mypy]
+python_version = "3.9"
+ignore_missing_imports = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+strict_optional = true
+exclude = "tosfs/tests/.*"
 
 [build-system]
 requires = ["poetry-core"]
