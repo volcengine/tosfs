@@ -29,6 +29,9 @@ from tosfs.utils import find_bucket_key
 # environment variable names
 ENV_NAME_TOSFS_LOGGING_LEVEL = "TOSFS_LOGGING_LEVEL"
 
+# constants
+SERVER_RESPONSE_CODE_NOT_FOUND = 404
+
 logger = logging.getLogger("tosfs")
 
 
@@ -96,12 +99,40 @@ class TosFileSystem(AbstractFileSystem):
     ) -> Union[List[dict], List[str]]:
         """List objects under the given path.
 
-        :param path: The path to list.
-        :param detail: Whether to return detailed information.
-        :param refresh: Whether to refresh the cache.
-        :param versions: Whether to list object versions.
-        :param kwargs: Additional arguments.
-        :return: A list of objects under the given path.
+        Parameters
+        ----------
+        path : str
+            The path to list.
+        detail : bool, optional
+            Whether to return detailed information (default is False).
+        refresh : bool, optional
+            Whether to refresh the cache (default is False).
+        versions : bool, optional
+            Whether to list object versions (default is False).
+        **kwargs : dict, optional
+            Additional arguments.
+
+        Returns
+        -------
+        Union[List[dict], List[str]]
+            A list of objects under the given path. If `detail` is True,
+            returns a list of dictionaries with detailed information.
+            Otherwise, returns a list of object names.
+
+        Raises
+        ------
+        IOError
+            If there is an error accessing the parent directory.
+
+        Examples
+        --------
+        >>> fs = TosFileSystem()
+        >>> fs.ls("mybucket")
+        ['mybucket/file1', 'mybucket/file2']
+        >>> fs.ls("mybucket", detail=True)
+        [{'name': 'mybucket/file1', 'size': 123, 'type': 'file'},
+        {'name': 'mybucket/file2', 'size': 456, 'type': 'file'}]
+
         """
         path = self._strip_protocol(path).rstrip("/")
         if path in ["", "/"]:
@@ -124,11 +155,253 @@ class TosFileSystem(AbstractFileSystem):
 
         return files if detail else sorted([o["name"] for o in files])
 
+    def info(
+        self,
+        path: str,
+        bucket: Optional[str] = None,
+        key: Optional[str] = None,
+        refresh: bool = False,
+        version_id: Optional[str] = None,
+    ) -> dict:
+        """Give details of entry at path.
+
+        Returns a single dictionary, with exactly the same information as ``ls``
+        would with ``detail=True``.
+
+        The default implementation should calls ls and could be overridden by a
+        shortcut. kwargs are passed on to ```ls()``.
+
+        Some file systems might not be able to measure the file's size, in
+        which case, the returned dict will include ``'size': None``.
+
+        Returns
+        -------
+        dict with keys: name (full path in the FS), size (in bytes), type (file,
+        directory, or something else) and other FS-specific keys.
+
+        """
+        if path in ["/", ""]:
+            return {"name": path, "size": 0, "type": "directory"}
+        path = self._strip_protocol(path)
+        bucket, key, path_version_id = self._split_path(path)
+        fullpath = "/".join((bucket, key))
+
+        if version_id is not None and not self.version_aware:
+            raise ValueError(
+                "version_id cannot be specified due to the "
+                "filesystem is not support version aware."
+            )
+
+        if not refresh and (info := self._info_from_cache(path, fullpath, version_id)):
+            return info
+
+        if not key:
+            return self._bucket_info(bucket)
+
+        if info := self._object_info(bucket, key, version_id):
+            return info
+
+        return self._try_dir_info(bucket, key, path, fullpath)
+
+    def _info_from_cache(
+        self, path: str, fullpath: str, version_id: Optional[str]
+    ) -> dict:
+        out = self._ls_from_cache(fullpath)
+        if out is not None:
+            if self.version_aware and version_id is not None:
+                # If cached info does not match requested version_id,
+                # fallback to calling head_object
+                out = [
+                    o
+                    for o in out
+                    if o["name"] == fullpath and version_id == o.get("VersionId")
+                ]
+                if out:
+                    return out[0]
+            else:
+                out = [
+                    o
+                    for o in out
+                    if o["name"] == fullpath or o["name"] == fullpath.rstrip("/")
+                ]
+                if out:
+                    return out[0]
+                return {"name": path, "size": 0, "type": "directory"}
+
+        return {}
+
+    def _bucket_info(self, bucket: str) -> dict:
+        """Get the information of a bucket.
+
+        Parameters
+        ----------
+        bucket : str
+            The name of the bucket.
+
+        Returns
+        -------
+        dict
+            A dictionary containing the bucket information with the following keys:
+            - 'Key': The bucket name.
+            - 'Size': The size of the bucket (always 0).
+            - 'StorageClass': The storage class of the bucket (always 'BUCKET').
+            - 'size': The size of the bucket (always 0).
+            - 'type': The type of the bucket (always 'directory').
+            - 'name': The bucket name.
+
+        Raises
+        ------
+        tos.exceptions.TosClientError
+            If there is a client error while accessing the bucket.
+        tos.exceptions.TosServerError
+            If there is a server error while accessing the bucket.
+        FileNotFoundError
+            If the bucket does not exist.
+        TosfsError
+            If there is an unknown error while accessing the bucket.
+
+        """
+        try:
+            self.tos_client.head_bucket(bucket)
+            return self._fill_bucket_info(bucket)
+        except tos.exceptions.TosClientError as e:
+            logger.error("Tosfs failed with client error: %s", e)
+            raise e
+        except tos.exceptions.TosServerError as e:
+            if e.status_code == SERVER_RESPONSE_CODE_NOT_FOUND:
+                raise FileNotFoundError(bucket) from e
+            else:
+                logger.error("Tosfs failed with server error: %s", e)
+                raise e
+        except Exception as e:
+            logger.error("Tosfs failed with unknown error: %s", e)
+            raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
+
+    def _object_info(
+        self, bucket: str, key: str, version_id: Optional[str] = None
+    ) -> dict:
+        """Get the information of an object.
+
+        Parameters
+        ----------
+        bucket : str
+            The bucket name.
+        key : str
+            The object key.
+        version_id : str, optional
+            The version id of the object (default is None).
+
+        Returns
+        -------
+        dict
+            A dictionary containing the object information with the following keys:
+            - 'ETag': The entity tag of the object.
+            - 'LastModified': The last modified date of the object.
+            - 'size': The size of the object in bytes.
+            - 'name': The full path of the object.
+            - 'type': The type of the object (always 'file').
+            - 'StorageClass': The storage class of the object.
+            - 'VersionId': The version id of the object.
+            - 'ContentType': The content type of the object.
+
+        Raises
+        ------
+        tos.exceptions.TosClientError
+            If there is a client error while accessing the object.
+        tos.exceptions.TosServerError
+            If there is a server error while accessing the object.
+        TosfsError
+            If there is an unknown error while accessing the object.
+
+        """
+        try:
+            out = self.tos_client.head_object(bucket, key, version_id=version_id)
+            return {
+                "ETag": out.etag or "",
+                "LastModified": out.last_modified or "",
+                "size": out.content_length or 0,
+                "name": "/".join((bucket, key)),
+                "type": "file",
+                "StorageClass": out.storage_class or "STANDARD",
+                "VersionId": out.version_id or "",
+                "ContentType": out.content_type or "",
+            }
+        except tos.exceptions.TosClientError as e:
+            logger.error("Tosfs failed with client error: %s", e)
+            raise e
+        except tos.exceptions.TosServerError as e:
+            if e.status_code == SERVER_RESPONSE_CODE_NOT_FOUND:
+                pass
+            else:
+                logger.error("Tosfs failed with server error: %s", e)
+                raise e
+        except Exception as e:
+            logger.error("Tosfs failed with unknown error: %s", e)
+            raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
+
+        return {}
+
+    def _try_dir_info(self, bucket: str, key: str, path: str, fullpath: str) -> dict:
+        try:
+            # We check to see if the path is a directory by attempting to list its
+            # contexts. If anything is found, it is indeed a directory
+            out = self.tos_client.list_objects_type2(
+                bucket,
+                prefix=key.rstrip("/") + "/" if key else "",
+                delimiter="/",
+                max_keys=1,
+            )
+
+            if out.key_count > 0 or out.contents or out.common_prefixes:
+                return {
+                    "name": fullpath,
+                    "type": "directory",
+                    "size": 0,
+                    "StorageClass": "DIRECTORY",
+                }
+
+            raise FileNotFoundError(path)
+        except tos.exceptions.TosClientError as e:
+            logger.error("Tosfs failed with client error: %s", e)
+            raise e
+        except tos.exceptions.TosServerError as e:
+            logger.error("Tosfs failed with server error: %s", e)
+            raise e
+        except FileNotFoundError as e:
+            raise e
+        except Exception as e:
+            logger.error("Tosfs failed with unknown error: %s", e)
+            raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
+
     def _lsbuckets(self, refresh: bool = False) -> List[dict]:
         """List all buckets in the account.
 
-        :param refresh: Whether to refresh the cache.
-        :return: A list of buckets.
+        Parameters
+        ----------
+        refresh : bool, optional
+            Whether to refresh the cache (default is False).
+
+        Returns
+        -------
+        List[dict]
+            A list of dictionaries,
+            each containing information about a bucket with the following keys:
+            - 'Key': The bucket name.
+            - 'Size': The size of the bucket (always 0).
+            - 'StorageClass': The storage class of the bucket (always 'BUCKET').
+            - 'size': The size of the bucket (always 0).
+            - 'type': The type of the bucket (always 'directory').
+            - 'name': The bucket name.
+
+        Raises
+        ------
+        tos.exceptions.TosClientError
+            If there is a client error while listing the buckets.
+        tos.exceptions.TosServerError
+            If there is a server error while listing the buckets.
+        TosfsError
+            If there is an unknown error while listing the buckets.
+
         """
         if "" not in self.dircache or refresh:
             try:
@@ -143,17 +416,7 @@ class TosFileSystem(AbstractFileSystem):
                 logger.error("Tosfs failed with unknown error: %s", e)
                 raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
 
-            buckets = [
-                {
-                    "Key": bucket.name,
-                    "Size": 0,
-                    "StorageClass": "BUCKET",
-                    "size": 0,
-                    "type": "directory",
-                    "name": bucket.name,
-                }
-                for bucket in resp.buckets
-            ]
+            buckets = [self._fill_bucket_info(bucket.name) for bucket in resp.buckets]
             self.dircache[""] = buckets
 
         return self.dircache[""]
@@ -167,15 +430,41 @@ class TosFileSystem(AbstractFileSystem):
         prefix: str = "",
         versions: bool = False,
     ) -> List[Union[CommonPrefixInfo, ListedObject, ListedObjectVersion]]:
-        """List objects in a bucket, here we use cache to improve performance.
+        """List objects in a directory.
 
-        :param path: The path to list.
-        :param refresh: Whether to refresh the cache.
-        :param max_items: The maximum number of items to return, default is 1000.
-        :param delimiter: The delimiter to use for grouping objects.
-        :param prefix: The prefix to use for filtering objects.
-        :param versions: Whether to list object versions.
-        :return: A list of objects in the bucket.
+        Parameters
+        ----------
+        path : str
+            The path to list.
+        refresh : bool, optional
+            Whether to refresh the cache (default is False).
+        max_items : int, optional
+            The maximum number of items to return (default is 1000).
+        delimiter : str, optional
+            The delimiter to use for grouping objects (default is '/').
+        prefix : str, optional
+            The prefix to use for filtering objects (default is '').
+        versions : bool, optional
+            Whether to list object versions (default is False).
+
+        Returns
+        -------
+        List[Union[CommonPrefixInfo, ListedObject, ListedObjectVersion]]
+            A list of objects in the directory.
+            The list may contain `CommonPrefixInfo` for directories,
+            `ListedObject` for files, and `ListedObjectVersion` for versioned objects.
+
+        Raises
+        ------
+        ValueError
+            If `versions` is specified but the filesystem is not version aware.
+        tos.exceptions.TosClientError
+            If there is a client error while listing the objects.
+        tos.exceptions.TosServerError
+            If there is a server error while listing the objects.
+        TosfsError
+            If there is an unknown error while listing the objects.
+
         """
         bucket, key, _ = self._split_path(path)
         if not prefix:
@@ -214,12 +503,37 @@ class TosFileSystem(AbstractFileSystem):
     ) -> List[Union[CommonPrefixInfo, ListedObject, ListedObjectVersion]]:
         """List objects in a bucket.
 
-        :param bucket: The bucket name.
-        :param max_items: The maximum number of items to return, default is 1000.
-        :param delimiter: The delimiter to use for grouping objects.
-        :param prefix: The prefix to use for filtering objects.
-        :param versions: Whether to list object versions.
-        :return: A list of objects in the bucket.
+        Parameters
+        ----------
+        bucket : str
+            The bucket name.
+        max_items : int, optional
+            The maximum number of items to return (default is 1000).
+        delimiter : str, optional
+            The delimiter to use for grouping objects (default is '/').
+        prefix : str, optional
+            The prefix to use for filtering objects (default is '').
+        versions : bool, optional
+            Whether to list object versions (default is False).
+
+        Returns
+        -------
+        List[Union[CommonPrefixInfo, ListedObject, ListedObjectVersion]]
+            A list of objects in the bucket.
+            The list may contain `CommonPrefixInfo` for directories,
+            `ListedObject` for files, and `ListedObjectVersion` for versioned objects.
+
+        Raises
+        ------
+        ValueError
+            If `versions` is specified but the filesystem is not version aware.
+        tos.exceptions.TosClientError
+            If there is a client error while listing the objects.
+        tos.exceptions.TosServerError
+            If there is a server error while listing the objects.
+        TosfsError
+            If there is an unknown error while listing the objects.
+
         """
         if versions and not self.version_aware:
             raise ValueError(
@@ -354,3 +668,14 @@ class TosFileSystem(AbstractFileSystem):
         ):
             result["name"] += f"?versionId={obj.version_id}"
         return result
+
+    @staticmethod
+    def _fill_bucket_info(bucket_name: str) -> dict:
+        return {
+            "Key": bucket_name,
+            "Size": 0,
+            "StorageClass": "BUCKET",
+            "size": 0,
+            "type": "directory",
+            "name": bucket_name,
+        }
