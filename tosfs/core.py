@@ -99,12 +99,40 @@ class TosFileSystem(AbstractFileSystem):
     ) -> Union[List[dict], List[str]]:
         """List objects under the given path.
 
-        :param path: The path to list.
-        :param detail: Whether to return detailed information.
-        :param refresh: Whether to refresh the cache.
-        :param versions: Whether to list object versions.
-        :param kwargs: Additional arguments.
-        :return: A list of objects under the given path.
+        Parameters
+        ----------
+        path : str
+            The path to list.
+        detail : bool, optional
+            Whether to return detailed information (default is False).
+        refresh : bool, optional
+            Whether to refresh the cache (default is False).
+        versions : bool, optional
+            Whether to list object versions (default is False).
+        **kwargs : dict, optional
+            Additional arguments.
+
+        Returns
+        -------
+        Union[List[dict], List[str]]
+            A list of objects under the given path. If `detail` is True,
+            returns a list of dictionaries with detailed information.
+            Otherwise, returns a list of object names.
+
+        Raises
+        ------
+        IOError
+            If there is an error accessing the parent directory.
+
+        Examples
+        --------
+        >>> fs = TosFileSystem()
+        >>> fs.ls("mybucket")
+        ['mybucket/file1', 'mybucket/file2']
+        >>> fs.ls("mybucket", detail=True)
+        [{'name': 'mybucket/file1', 'size': 123, 'type': 'file'},
+        {'name': 'mybucket/file2', 'size': 456, 'type': 'file'}]
+
         """
         path = self._strip_protocol(path).rstrip("/")
         if path in ["", "/"]:
@@ -205,8 +233,33 @@ class TosFileSystem(AbstractFileSystem):
     def _bucket_info(self, bucket: str) -> dict:
         """Get the information of a bucket.
 
-        :param bucket: The bucket name.
-        :return: The information of the bucket.
+        Parameters
+        ----------
+        bucket : str
+            The name of the bucket.
+
+        Returns
+        -------
+        dict
+            A dictionary containing the bucket information with the following keys:
+            - 'Key': The bucket name.
+            - 'Size': The size of the bucket (always 0).
+            - 'StorageClass': The storage class of the bucket (always 'BUCKET').
+            - 'size': The size of the bucket (always 0).
+            - 'type': The type of the bucket (always 'directory').
+            - 'name': The bucket name.
+
+        Raises
+        ------
+        tos.exceptions.TosClientError
+            If there is a client error while accessing the bucket.
+        tos.exceptions.TosServerError
+            If there is a server error while accessing the bucket.
+        FileNotFoundError
+            If the bucket does not exist.
+        TosfsError
+            If there is an unknown error while accessing the bucket.
+
         """
         try:
             self.tos_client.head_bucket(bucket)
@@ -229,10 +282,37 @@ class TosFileSystem(AbstractFileSystem):
     ) -> dict:
         """Get the information of an object.
 
-        :param bucket: The bucket name.
-        :param key: The object key.
-        :param version_id: The version id of the object.
-        :return: The information of the object.
+        Parameters
+        ----------
+        bucket : str
+            The bucket name.
+        key : str
+            The object key.
+        version_id : str, optional
+            The version id of the object (default is None).
+
+        Returns
+        -------
+        dict
+            A dictionary containing the object information with the following keys:
+            - 'ETag': The entity tag of the object.
+            - 'LastModified': The last modified date of the object.
+            - 'size': The size of the object in bytes.
+            - 'name': The full path of the object.
+            - 'type': The type of the object (always 'file').
+            - 'StorageClass': The storage class of the object.
+            - 'VersionId': The version id of the object.
+            - 'ContentType': The content type of the object.
+
+        Raises
+        ------
+        tos.exceptions.TosClientError
+            If there is a client error while accessing the object.
+        tos.exceptions.TosServerError
+            If there is a server error while accessing the object.
+        TosfsError
+            If there is an unknown error while accessing the object.
+
         """
         try:
             out = self.tos_client.head_object(bucket, key, version_id=version_id)
@@ -296,8 +376,32 @@ class TosFileSystem(AbstractFileSystem):
     def _lsbuckets(self, refresh: bool = False) -> List[dict]:
         """List all buckets in the account.
 
-        :param refresh: Whether to refresh the cache.
-        :return: A list of buckets.
+        Parameters
+        ----------
+        refresh : bool, optional
+            Whether to refresh the cache (default is False).
+
+        Returns
+        -------
+        List[dict]
+            A list of dictionaries,
+            each containing information about a bucket with the following keys:
+            - 'Key': The bucket name.
+            - 'Size': The size of the bucket (always 0).
+            - 'StorageClass': The storage class of the bucket (always 'BUCKET').
+            - 'size': The size of the bucket (always 0).
+            - 'type': The type of the bucket (always 'directory').
+            - 'name': The bucket name.
+
+        Raises
+        ------
+        tos.exceptions.TosClientError
+            If there is a client error while listing the buckets.
+        tos.exceptions.TosServerError
+            If there is a server error while listing the buckets.
+        TosfsError
+            If there is an unknown error while listing the buckets.
+
         """
         if "" not in self.dircache or refresh:
             try:
@@ -326,15 +430,41 @@ class TosFileSystem(AbstractFileSystem):
         prefix: str = "",
         versions: bool = False,
     ) -> List[Union[CommonPrefixInfo, ListedObject, ListedObjectVersion]]:
-        """List objects in a bucket, here we use cache to improve performance.
+        """List objects in a directory.
 
-        :param path: The path to list.
-        :param refresh: Whether to refresh the cache.
-        :param max_items: The maximum number of items to return, default is 1000.
-        :param delimiter: The delimiter to use for grouping objects.
-        :param prefix: The prefix to use for filtering objects.
-        :param versions: Whether to list object versions.
-        :return: A list of objects in the bucket.
+        Parameters
+        ----------
+        path : str
+            The path to list.
+        refresh : bool, optional
+            Whether to refresh the cache (default is False).
+        max_items : int, optional
+            The maximum number of items to return (default is 1000).
+        delimiter : str, optional
+            The delimiter to use for grouping objects (default is '/').
+        prefix : str, optional
+            The prefix to use for filtering objects (default is '').
+        versions : bool, optional
+            Whether to list object versions (default is False).
+
+        Returns
+        -------
+        List[Union[CommonPrefixInfo, ListedObject, ListedObjectVersion]]
+            A list of objects in the directory.
+            The list may contain `CommonPrefixInfo` for directories,
+            `ListedObject` for files, and `ListedObjectVersion` for versioned objects.
+
+        Raises
+        ------
+        ValueError
+            If `versions` is specified but the filesystem is not version aware.
+        tos.exceptions.TosClientError
+            If there is a client error while listing the objects.
+        tos.exceptions.TosServerError
+            If there is a server error while listing the objects.
+        TosfsError
+            If there is an unknown error while listing the objects.
+
         """
         bucket, key, _ = self._split_path(path)
         if not prefix:
@@ -373,12 +503,37 @@ class TosFileSystem(AbstractFileSystem):
     ) -> List[Union[CommonPrefixInfo, ListedObject, ListedObjectVersion]]:
         """List objects in a bucket.
 
-        :param bucket: The bucket name.
-        :param max_items: The maximum number of items to return, default is 1000.
-        :param delimiter: The delimiter to use for grouping objects.
-        :param prefix: The prefix to use for filtering objects.
-        :param versions: Whether to list object versions.
-        :return: A list of objects in the bucket.
+        Parameters
+        ----------
+        bucket : str
+            The bucket name.
+        max_items : int, optional
+            The maximum number of items to return (default is 1000).
+        delimiter : str, optional
+            The delimiter to use for grouping objects (default is '/').
+        prefix : str, optional
+            The prefix to use for filtering objects (default is '').
+        versions : bool, optional
+            Whether to list object versions (default is False).
+
+        Returns
+        -------
+        List[Union[CommonPrefixInfo, ListedObject, ListedObjectVersion]]
+            A list of objects in the bucket.
+            The list may contain `CommonPrefixInfo` for directories,
+            `ListedObject` for files, and `ListedObjectVersion` for versioned objects.
+
+        Raises
+        ------
+        ValueError
+            If `versions` is specified but the filesystem is not version aware.
+        tos.exceptions.TosClientError
+            If there is a client error while listing the objects.
+        tos.exceptions.TosServerError
+            If there is a server error while listing the objects.
+        TosfsError
+            If there is an unknown error while listing the objects.
+
         """
         if versions and not self.version_aware:
             raise ValueError(
