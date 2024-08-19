@@ -18,6 +18,7 @@ import pytest
 from tos.exceptions import TosServerError
 
 from tosfs.core import TosFileSystem
+from tosfs.exceptions import TosfsError
 from tosfs.utils import random_path
 
 
@@ -35,11 +36,11 @@ def test_ls_bucket(tosfs: TosFileSystem, bucket: str) -> None:
 
 
 def test_ls_dir(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
-    assert temporary_workspace in tosfs.ls(bucket, detail=False)
+    assert f"{bucket}/{temporary_workspace}" in tosfs.ls(bucket, detail=False)
     detailed_list = tosfs.ls(bucket, detail=True)
     assert detailed_list
     for item in detailed_list:
-        if item["name"] == temporary_workspace:
+        if item["name"] == f"{bucket}/{temporary_workspace}":
             assert item["type"] == "directory"
             break
     else:
@@ -105,3 +106,28 @@ def test_info(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> No
 
     with pytest.raises(FileNotFoundError):
         tosfs.info(f"{bucket}/nonexistent")
+
+
+def test_rmdir(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
+    with pytest.raises(TosfsError):
+        tosfs.rmdir(bucket)
+
+    file_name = random_path()
+    tosfs.tos_client.put_object(bucket=bucket, key=f"{temporary_workspace}/{file_name}")
+    assert f"{bucket}/{temporary_workspace}/{file_name}" in tosfs.ls(
+        f"{bucket}/{temporary_workspace}", detail=False
+    )
+
+    with pytest.raises(TosfsError):
+        tosfs.rmdir(f"{bucket}/{temporary_workspace}")
+
+    with pytest.raises(NotADirectoryError):
+        tosfs.rmdir(f"{bucket}/{temporary_workspace}/{file_name}")
+
+    tosfs._rm(f"{bucket}/{temporary_workspace}/{file_name}")
+    assert tosfs.ls(f"{bucket}/{temporary_workspace}", detail=False) == []
+
+    tosfs.rmdir(f"{bucket}/{temporary_workspace}")
+    assert f"{bucket}/{temporary_workspace}" not in tosfs.ls(
+        bucket, detail=False, refresh=True
+    )
