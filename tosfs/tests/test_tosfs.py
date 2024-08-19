@@ -83,3 +83,25 @@ def test_inner_rm(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -
     assert tosfs.ls(f"{bucket}/{temporary_workspace}", detail=False) == []
 
     tosfs._rm(f"{bucket}/{temporary_workspace}/{file_name}")
+
+
+def test_info(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
+    assert tosfs.info("") == {"name": "", "size": 0, "type": "directory"}
+    assert tosfs.info("/") == {"name": "/", "size": 0, "type": "directory"}
+    assert tosfs.info(bucket) == {
+        "Key": "proton-ci",
+        "Size": 0,
+        "StorageClass": "BUCKET",
+        "name": "proton-ci",
+        "size": 0,
+        "type": "directory",
+    }
+    assert tosfs.info(f"{bucket}/{temporary_workspace}") == {
+        "name": f"{bucket}/{temporary_workspace}",
+        "type": "directory",
+        "size": 0,
+        "StorageClass": "DIRECTORY",
+    }
+
+    with pytest.raises(FileNotFoundError):
+        tosfs.info(f"{bucket}/nonexistent")
