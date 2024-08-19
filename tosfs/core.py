@@ -75,6 +75,17 @@ class TosFileSystem(AbstractFileSystem):
         self.version_aware = version_aware
         super().__init__(**kwargs)
 
+    def invalidate_cache(self, path: Optional[str] = None) -> None:
+        """Invalidate the cache for the given path."""
+        if path is None:
+            self.dircache.clear()
+        else:
+            path = self._strip_protocol(path)
+            self.dircache.pop(path, None)
+            while path:
+                self.dircache.pop(path, None)
+                path = self._parent(path)
+
     def ls(
         self,
         path: str,
@@ -262,6 +273,22 @@ class TosFileSystem(AbstractFileSystem):
                 e.message,
                 e.cause,
             )
+            raise e
+        except tos.exceptions.TosServerError as e:
+            logger.error("Tosfs failed with server error: %s", e)
+            raise e
+        except Exception as e:
+            logger.error("Tosfs failed with unknown error: %s", e)
+            raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
+
+    def _rm(self, path: str) -> None:
+        bucket, key, _ = self._split_path(path)
+        self.invalidate_cache(path)
+
+        try:
+            self.tos_client.delete_object(bucket, key)
+        except tos.exceptions.TosClientError as e:
+            logger.error("Tosfs failed with client error: %s", e)
             raise e
         except tos.exceptions.TosServerError as e:
             logger.error("Tosfs failed with server error: %s", e)
