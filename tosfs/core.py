@@ -314,16 +314,13 @@ class TosFileSystem(AbstractFileSystem):
             self.tos_client.head_bucket(bucket)
             return self._fill_bucket_info(bucket)
         except tos.exceptions.TosClientError as e:
-            logger.error("Tosfs failed with client error: %s", e)
             raise e
         except tos.exceptions.TosServerError as e:
             if e.status_code == SERVER_RESPONSE_CODE_NOT_FOUND:
                 raise FileNotFoundError(bucket) from e
             else:
-                logger.error("Tosfs failed with server error: %s", e)
                 raise e
         except Exception as e:
-            logger.error("Tosfs failed with unknown error: %s", e)
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
 
     def _object_info(
@@ -376,16 +373,13 @@ class TosFileSystem(AbstractFileSystem):
                 "ContentType": out.content_type or "",
             }
         except tos.exceptions.TosClientError as e:
-            logger.error("Tosfs failed with client error: %s", e)
             raise e
         except tos.exceptions.TosServerError as e:
             if e.status_code == SERVER_RESPONSE_CODE_NOT_FOUND:
                 pass
             else:
-                logger.error("Tosfs failed with server error: %s", e)
                 raise e
         except Exception as e:
-            logger.error("Tosfs failed with unknown error: %s", e)
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
 
         return {}
@@ -411,15 +405,12 @@ class TosFileSystem(AbstractFileSystem):
 
             raise FileNotFoundError(path)
         except tos.exceptions.TosClientError as e:
-            logger.error("Tosfs failed with client error: %s", e)
             raise e
         except tos.exceptions.TosServerError as e:
-            logger.error("Tosfs failed with server error: %s", e)
             raise e
         except FileNotFoundError as e:
             raise e
         except Exception as e:
-            logger.error("Tosfs failed with unknown error: %s", e)
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
 
     def _lsbuckets(self, refresh: bool = False) -> List[dict]:
@@ -456,13 +447,10 @@ class TosFileSystem(AbstractFileSystem):
             try:
                 resp = self.tos_client.list_buckets()
             except tos.exceptions.TosClientError as e:
-                logger.error("Tosfs failed with client error: %s", e)
                 raise e
             except tos.exceptions.TosServerError as e:
-                logger.error("Tosfs failed with server error: %s", e)
                 raise e
             except Exception as e:
-                logger.error("Tosfs failed with unknown error: %s", e)
                 raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
 
             buckets = [self._fill_bucket_info(bucket.name) for bucket in resp.buckets]
@@ -631,17 +619,10 @@ class TosFileSystem(AbstractFileSystem):
 
             return all_results
         except tos.exceptions.TosClientError as e:
-            logger.error(
-                "Tosfs failed with client error, message:%s, cause: %s",
-                e.message,
-                e.cause,
-            )
             raise e
         except tos.exceptions.TosServerError as e:
-            logger.error("Tosfs failed with server error: %s", e)
             raise e
         except Exception as e:
-            logger.error("Tosfs failed with unknown error: %s", e)
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
 
     def _rm(self, path: str) -> None:
@@ -651,13 +632,10 @@ class TosFileSystem(AbstractFileSystem):
         try:
             self.tos_client.delete_object(bucket, key)
         except tos.exceptions.TosClientError as e:
-            logger.error("Tosfs failed with client error: %s", e)
             raise e
         except tos.exceptions.TosServerError as e:
-            logger.error("Tosfs failed with server error: %s", e)
             raise e
         except Exception as e:
-            logger.error("Tosfs failed with unknown error: %s", e)
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
 
     def _split_path(self, path: str) -> Tuple[str, str, Optional[str]]:
