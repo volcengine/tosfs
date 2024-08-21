@@ -203,6 +203,55 @@ class TosFileSystem(AbstractFileSystem):
 
         return self._try_dir_info(bucket, key, path, fullpath)
 
+    def rmdir(self, path: str) -> None:
+        """Remove a directory if it is empty.
+
+        Parameters
+        ----------
+        path : str
+            The path of the directory to remove. The path should be in the format
+            `tos://bucket/path/to/directory`.
+
+        Raises
+        ------
+        FileNotFoundError
+            If the directory does not exist.
+        NotADirectoryError
+            If the path is not a directory.
+        TosfsError
+            If the directory is not empty,
+             or the path is a bucket.
+
+        Examples
+        --------
+        >>> fs = TosFileSystem()
+        >>> fs.rmdir("tos://mybucket/mydir/")
+
+        """
+        path = self._strip_protocol(path).rstrip("/") + "/"
+        bucket, key, _ = self._split_path(path)
+        if not key:
+            raise TosfsError("Cannot remove a bucket using rmdir api.")
+
+        if not self.exists(path):
+            raise FileNotFoundError(f"Directory {path} not found.")
+
+        if not self.isdir(path):
+            raise NotADirectoryError(f"{path} is not a directory.")
+
+        if len(self._listdir(bucket, max_items=1, prefix=key.rstrip("/") + "/")) > 0:
+            raise TosfsError(f"Directory {path} is not empty.")
+
+        try:
+            self.tos_client.delete_object(bucket, key.rstrip("/") + "/")
+            self.invalidate_cache(path.rstrip("/"))
+        except tos.exceptions.TosClientError as e:
+            raise e
+        except tos.exceptions.TosServerError as e:
+            raise e
+        except Exception as e:
+            raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
+
     def _info_from_cache(
         self, path: str, fullpath: str, version_id: Optional[str]
     ) -> dict:
@@ -643,9 +692,10 @@ class TosFileSystem(AbstractFileSystem):
 
     @staticmethod
     def _fill_common_prefix_info(common_prefix: CommonPrefixInfo, bucket: str) -> dict:
+        name = "/".join([bucket, common_prefix.prefix[:-1]])
         return {
-            "name": common_prefix.prefix[:-1],
-            "Key": "/".join([bucket, common_prefix.prefix]),
+            "name": name,
+            "Key": name,
             "Size": 0,
             "type": "directory",
         }

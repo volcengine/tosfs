@@ -18,7 +18,7 @@ from typing import Generator
 import pytest
 from tos import EnvCredentialsProvider
 
-from tosfs.core import TosFileSystem
+from tosfs.core import TosFileSystem, logger
 from tosfs.utils import random_path
 
 
@@ -54,6 +54,8 @@ def temporary_workspace(
     # will replace with tosfs.mkdir in the future
     tosfs.tos_client.put_object(bucket=bucket, key=f"{workspace}/")
     yield workspace
-    # currently, remove dir via purely tos python client,
-    # will replace with tosfs.rmdir in the future
-    tosfs.tos_client.delete_object(bucket=bucket, key=f"{workspace}/")
+    try:
+        tosfs.rmdir(f"{bucket}/{workspace}/")
+    except Exception:
+        logger.error("Ignore exception.")
+    assert not tosfs.exists(f"{bucket}/{workspace}/")
