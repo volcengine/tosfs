@@ -11,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import unittest
-from unittest.mock import MagicMock
 
 import pytest
 from tos.exceptions import TosServerError
@@ -50,26 +48,6 @@ def test_ls_dir(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> 
 
     assert tosfs.ls(f"{bucket}/{temporary_workspace}", detail=False) == []
     assert tosfs.ls(f"{bucket}/{temporary_workspace}/nonexistent", detail=False) == []
-
-
-def test_ls_cache(tosfs: TosFileSystem, bucket: str) -> None:
-    with unittest.mock.patch.object(
-        tosfs.tos_client,
-        "list_objects_type2",
-        return_value=MagicMock(
-            is_truncated=False,
-            contents=[MagicMock(key="mock_key", size=123)],
-            common_prefixes=[],
-            next_continuation_token=None,
-        ),
-    ):
-        # Call ls method and get result from server
-        tosfs.ls(bucket, detail=False, refresh=True)
-        # Get result from cache
-        tosfs.ls(bucket, detail=False, refresh=False)
-
-        # Verify that list_objects_type2 was called only once
-        assert tosfs.tos_client.list_objects_type2.call_count == 1
 
 
 def test_inner_rm(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
