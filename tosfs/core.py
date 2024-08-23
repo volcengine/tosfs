@@ -15,7 +15,7 @@
 """The core module of TOSFS."""
 import logging
 import os
-from typing import List, Optional, Tuple, Union
+from typing import Any, List, Optional, Tuple, Union
 
 import tos
 from fsspec import AbstractFileSystem
@@ -224,6 +224,50 @@ class TosFileSystem(AbstractFileSystem):
 
         try:
             self.tos_client.delete_object(bucket, key.rstrip("/") + "/")
+        except tos.exceptions.TosClientError as e:
+            raise e
+        except tos.exceptions.TosServerError as e:
+            raise e
+        except Exception as e:
+            raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
+
+    def touch(self, path: str, truncate: bool = True, **kwargs: Any) -> None:
+        """Create an empty file at the given path.
+
+        Parameters
+        ----------
+        path : str
+            The path of the file to create.
+        truncate : bool, optional
+            Whether to truncate the file if it already exists (default is True).
+        **kwargs : Any, optional
+            Additional arguments.
+
+        Raises
+        ------
+        FileExistsError
+            If the file already exists and `truncate` is False.
+        TosfsError
+            If there is an unknown error while creating the file.
+        tos.exceptions.TosClientError
+            If there is a client error while creating the file.
+        tos.exceptions.TosServerError
+            If there is a server error while creating the file.
+
+        Examples
+        --------
+        >>> fs = TosFileSystem()
+        >>> fs.touch("tos://mybucket/myfile")
+
+        """
+        path = self._strip_protocol(path)
+        bucket, key, _ = self._split_path(path)
+
+        if not truncate and self.exists(path):
+            raise FileExistsError(f"File {path} already exists.")
+
+        try:
+            self.tos_client.put_object(bucket, key)
         except tos.exceptions.TosClientError as e:
             raise e
         except tos.exceptions.TosServerError as e:
