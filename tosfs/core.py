@@ -323,6 +323,37 @@ class TosFileSystem(AbstractFileSystem):
         except Exception as e:
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
 
+    def isfile(self, path: str) -> bool:
+        """Check if the path is a file.
+
+        Parameters
+        ----------
+        path : str
+            The path to check.
+
+        Returns
+        -------
+        bool
+            True if the path is a file, False otherwise.
+
+        """
+        if path.endswith("/"):
+            return False
+
+        bucket, key, _ = self._split_path(path)
+        try:
+            # Attempt to get the object metadata
+            self.tos_client.head_object(bucket, key)
+            return True
+        except tos.exceptions.TosClientError as e:
+            raise e
+        except tos.exceptions.TosServerError as e:
+            if e.status_code == SERVER_RESPONSE_CODE_NOT_FOUND:
+                return False
+            raise e
+        except Exception as e:
+            raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
+
     def _bucket_info(self, bucket: str) -> dict:
         """Get the information of a bucket.
 
