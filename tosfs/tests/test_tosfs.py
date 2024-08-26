@@ -133,3 +133,20 @@ def test_touch(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> N
     tosfs.touch(f"{bucket}/{temporary_workspace}/{file_name}", truncate=True)
     assert tosfs.info(f"{bucket}/{temporary_workspace}/{file_name}")["size"] == 0
     tosfs.rm_file(f"{bucket}/{temporary_workspace}/{file_name}")
+
+
+def test_isdir(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
+    assert not tosfs.isdir("")
+    assert not tosfs.isdir("/")
+    assert not tosfs.isdir(bucket)
+    assert tosfs.isdir(f"{bucket}/{temporary_workspace}")
+    assert tosfs.isdir(f"{bucket}/{temporary_workspace}/")
+    assert not tosfs.isdir(f"{bucket}/{temporary_workspace}/nonexistent")
+    assert not tosfs.isdir(f"{bucket}/{temporary_workspace}/nonexistent/")
+
+    file_name = random_path()
+    tosfs.tos_client.put_object(bucket=bucket, key=f"{temporary_workspace}/{file_name}")
+    assert not tosfs.isdir(f"{bucket}/{temporary_workspace}/{file_name}")
+    assert not tosfs.isdir(f"{bucket}/{temporary_workspace}/{file_name}/")
+
+    tosfs._rm(f"{bucket}/{temporary_workspace}/{file_name}")
