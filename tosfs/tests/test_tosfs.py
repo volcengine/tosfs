@@ -150,3 +150,15 @@ def test_isdir(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> N
     assert not tosfs.isdir(f"{bucket}/{temporary_workspace}/{file_name}/")
 
     tosfs._rm(f"{bucket}/{temporary_workspace}/{file_name}")
+
+
+def test_isfile(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
+    file_name = random_path()
+    tosfs.tos_client.put_object(bucket=bucket, key=f"{temporary_workspace}/{file_name}")
+    assert tosfs.isfile(f"{bucket}/{temporary_workspace}/{file_name}")
+    assert not tosfs.isfile(f"{bucket}/{temporary_workspace}/{file_name}/")
+    assert not tosfs.isfile(f"{bucket}/{temporary_workspace}/nonexistfile")
+    assert not tosfs.isfile(f"{bucket}/{temporary_workspace}")
+    assert not tosfs.isfile(f"{bucket}/{temporary_workspace}/")
+
+    tosfs._rm(f"{bucket}/{temporary_workspace}/{file_name}")
