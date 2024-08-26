@@ -109,3 +109,27 @@ def test_rmdir(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> N
     assert f"{bucket}/{temporary_workspace}" not in tosfs.ls(
         bucket, detail=False, refresh=True
     )
+
+
+def test_touch(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
+    file_name = random_path()
+    assert not tosfs.exists(f"{bucket}/{temporary_workspace}/{file_name}")
+    tosfs.touch(f"{bucket}/{temporary_workspace}/{file_name}")
+    assert tosfs.exists(f"{bucket}/{temporary_workspace}/{file_name}")
+    assert tosfs.info(f"{bucket}/{temporary_workspace}/{file_name}")["size"] == 0
+
+    with pytest.raises(FileExistsError):
+        tosfs.touch(f"{bucket}/{temporary_workspace}/{file_name}", truncate=False)
+
+    tosfs.rm_file(f"{bucket}/{temporary_workspace}/{file_name}")
+    tosfs.touch(f"{bucket}/{temporary_workspace}/{file_name}", truncate=False)
+    assert tosfs.exists(f"{bucket}/{temporary_workspace}/{file_name}")
+
+    tosfs.rm_file(f"{bucket}/{temporary_workspace}/{file_name}")
+    tosfs.tos_client.put_object(
+        bucket=bucket, key=f"{temporary_workspace}/{file_name}", content="hello world"
+    )
+    assert tosfs.info(f"{bucket}/{temporary_workspace}/{file_name}")["size"] > 0
+    tosfs.touch(f"{bucket}/{temporary_workspace}/{file_name}", truncate=True)
+    assert tosfs.info(f"{bucket}/{temporary_workspace}/{file_name}")["size"] == 0
+    tosfs.rm_file(f"{bucket}/{temporary_workspace}/{file_name}")
