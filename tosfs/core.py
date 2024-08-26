@@ -23,14 +23,12 @@ from fsspec.utils import setup_logging as setup_logger
 from tos.models import CommonPrefixInfo
 from tos.models2 import ListedObject, ListedObjectVersion
 
+from tosfs.consts import TOS_SERVER_RESPONSE_CODE_NOT_FOUND
 from tosfs.exceptions import TosfsError
 from tosfs.utils import find_bucket_key
 
 # environment variable names
 ENV_NAME_TOSFS_LOGGING_LEVEL = "TOSFS_LOGGING_LEVEL"
-
-# constants
-SERVER_RESPONSE_CODE_NOT_FOUND = 404
 
 logger = logging.getLogger("tosfs")
 
@@ -316,7 +314,7 @@ class TosFileSystem(AbstractFileSystem):
         except tos.exceptions.TosClientError as e:
             raise e
         except tos.exceptions.TosServerError as e:
-            if e.status_code == SERVER_RESPONSE_CODE_NOT_FOUND:
+            if e.status_code == TOS_SERVER_RESPONSE_CODE_NOT_FOUND:
                 return False
             else:
                 raise e
@@ -348,7 +346,7 @@ class TosFileSystem(AbstractFileSystem):
         except tos.exceptions.TosClientError as e:
             raise e
         except tos.exceptions.TosServerError as e:
-            if e.status_code == SERVER_RESPONSE_CODE_NOT_FOUND:
+            if e.status_code == TOS_SERVER_RESPONSE_CODE_NOT_FOUND:
                 return False
             raise e
         except Exception as e:
@@ -391,7 +389,7 @@ class TosFileSystem(AbstractFileSystem):
         except tos.exceptions.TosClientError as e:
             raise e
         except tos.exceptions.TosServerError as e:
-            if e.status_code == SERVER_RESPONSE_CODE_NOT_FOUND:
+            if e.status_code == TOS_SERVER_RESPONSE_CODE_NOT_FOUND:
                 raise FileNotFoundError(bucket) from e
             else:
                 raise e
@@ -450,7 +448,7 @@ class TosFileSystem(AbstractFileSystem):
         except tos.exceptions.TosClientError as e:
             raise e
         except tos.exceptions.TosServerError as e:
-            if e.status_code == SERVER_RESPONSE_CODE_NOT_FOUND:
+            if e.status_code == TOS_SERVER_RESPONSE_CODE_NOT_FOUND:
                 pass
             else:
                 raise e
@@ -485,6 +483,152 @@ class TosFileSystem(AbstractFileSystem):
             raise e
         except FileNotFoundError as e:
             raise e
+        except Exception as e:
+            raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
+
+    def exists(self, path: str, **kwargs: Any) -> bool:
+        """Check if a path exists in the TOS.
+
+        Parameters
+        ----------
+        path : str
+            The path to check for existence.
+        **kwargs : Any, optional
+            Additional arguments if needed in the future.
+
+        Returns
+        -------
+        bool
+            True if the path exists, False otherwise.
+
+        Raises
+        ------
+        tos.exceptions.TosClientError
+            If there is a client error while checking the path.
+        tos.exceptions.TosServerError
+            If there is a server error while checking the path.
+        TosfsError
+            If there is an unknown error while checking the path.
+
+        Examples
+        --------
+        >>> fs = TosFileSystem()
+        >>> fs.exists("tos://bucket/to/file")
+        True
+        >>> fs.exists("tos://mybucket/nonexistentfile")
+        False
+
+        """
+        if path in ["", "/"]:
+            # the root always exists
+            return True
+
+        path = self._strip_protocol(path)
+        bucket, key, version_id = self._split_path(path)
+        # if the path is a bucket
+        if not key:
+            return self._exists_bucket(bucket)
+        else:
+            object_exists = self._exists_object(bucket, key, path, version_id)
+            if not object_exists:
+                return self._exists_object(
+                    bucket, key.rstrip("/") + "/", path, version_id
+                )
+            return object_exists
+
+    def _exists_bucket(self, bucket: str) -> bool:
+        """Check if a bucket exists in the TOS.
+
+        Parameters
+        ----------
+        bucket : str
+            The name of the bucket to check for existence.
+
+        Returns
+        -------
+        bool
+            True if the bucket exists, False otherwise.
+
+        Raises
+        ------
+        tos.exceptions.TosClientError
+            If there is a client error while checking the bucket.
+        tos.exceptions.TosServerError
+            If there is a server error while checking the bucket.
+        TosfsError
+            If there is an unknown error while checking the bucket.
+
+        Examples
+        --------
+        >>> fs = TosFileSystem()
+        >>> fs._exists_bucket("mybucket")
+        True
+        >>> fs._exists_bucket("nonexistentbucket")
+        False
+
+        """
+        try:
+            self.tos_client.head_bucket(bucket)
+            return True
+        except tos.exceptions.TosClientError as e:
+            raise e
+        except tos.exceptions.TosServerError as e:
+            if e.status_code == TOS_SERVER_RESPONSE_CODE_NOT_FOUND:
+                return False
+            else:
+                raise e
+        except Exception as e:
+            raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
+
+    def _exists_object(
+        self, bucket: str, key: str, path: str, version_id: Optional[str] = None
+    ) -> bool:
+        """Check if an object exists in the TOS.
+
+        Parameters
+        ----------
+        bucket : str
+            The name of the bucket.
+        key : str
+            The key of the object.
+        path : str
+            The full path of the object.
+        version_id : str, optional
+            The version ID of the object (default is None).
+
+        Returns
+        -------
+        bool
+            True if the object exists, False otherwise.
+
+        Raises
+        ------
+        tos.exceptions.TosClientError
+            If there is a client error while checking the object.
+        tos.exceptions.TosServerError
+            If there is a server error while checking the object.
+        TosfsError
+            If there is an unknown error while checking the object.
+
+        Examples
+        --------
+        >>> fs = TosFileSystem()
+        >>> fs._exists_object("mybucket", "myfile", "tos://mybucket/myfile")
+        True
+        >>> fs._exists_object("mybucket", "nonexistentfile", "tos://mybucket/nonexistentfile")
+        False
+
+        """
+        try:
+            self.tos_client.head_object(bucket, key)
+            return True
+        except tos.exceptions.TosClientError as e:
+            raise e
+        except tos.exceptions.TosServerError as e:
+            if e.status_code == TOS_SERVER_RESPONSE_CODE_NOT_FOUND:
+                return False
+            else:
+                raise e
         except Exception as e:
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
 

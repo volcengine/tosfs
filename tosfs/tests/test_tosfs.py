@@ -162,3 +162,27 @@ def test_isfile(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> 
     assert not tosfs.isfile(f"{bucket}/{temporary_workspace}/")
 
     tosfs._rm(f"{bucket}/{temporary_workspace}/{file_name}")
+
+
+def test_exists_bucket(
+    tosfs: TosFileSystem, bucket: str, temporary_workspace: str
+) -> None:
+    assert tosfs.exists("")
+    assert tosfs.exists("/")
+    assert tosfs.exists(bucket)
+    assert not tosfs.exists("nonexistent")
+
+
+def test_exists_object(
+    tosfs: TosFileSystem, bucket: str, temporary_workspace: str
+) -> None:
+    file_name = random_path()
+    tosfs.tos_client.put_object(bucket=bucket, key=f"{temporary_workspace}/{file_name}")
+    assert tosfs.exists(f"{bucket}/{temporary_workspace}")
+    assert tosfs.exists(f"{bucket}/{temporary_workspace}/")
+    assert tosfs.exists(f"{bucket}/{temporary_workspace}/{file_name}")
+    assert not tosfs.exists(f"{bucket}/{temporary_workspace}/nonexistent")
+    assert not tosfs.exists(f"{bucket}/nonexistent")
+    assert not tosfs.exists(f"{bucket}/{temporary_workspace}/nonexistent")
+    tosfs.rm_file(f"{bucket}/{temporary_workspace}/{file_name}")
+    assert not tosfs.exists(f"{bucket}/{temporary_workspace}/{file_name}")
