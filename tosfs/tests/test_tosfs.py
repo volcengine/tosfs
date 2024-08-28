@@ -186,3 +186,77 @@ def test_exists_object(
     assert not tosfs.exists(f"{bucket}/{temporary_workspace}/nonexistent")
     tosfs.rm_file(f"{bucket}/{temporary_workspace}/{file_name}")
     assert not tosfs.exists(f"{bucket}/{temporary_workspace}/{file_name}")
+
+
+def test_mkdir(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
+    dir_name = random_path()
+
+    with pytest.raises(TosfsError):
+        tosfs.mkdir(f"{bucket}")
+
+    with pytest.raises(TosfsError):
+        tosfs.mkdir(f"{bucket}/")
+
+    with pytest.raises(TosfsError):
+        tosfs.mkdir("/")
+
+    tosfs.mkdir(f"{bucket}/{temporary_workspace}/{dir_name}")
+    assert tosfs.exists(f"{bucket}/{temporary_workspace}/{dir_name}")
+    assert tosfs.isdir(f"{bucket}/{temporary_workspace}/{dir_name}")
+
+    tosfs.rmdir(f"{bucket}/{temporary_workspace}/{dir_name}")
+    assert not tosfs.exists(f"{bucket}/{temporary_workspace}/{dir_name}")
+
+    tosfs.mkdir(f"{bucket}/{temporary_workspace}/{dir_name}", create_parents=False)
+    assert tosfs.exists(f"{bucket}/{temporary_workspace}/{dir_name}")
+
+    with pytest.raises(FileNotFoundError):
+        tosfs.mkdir(
+            f"{bucket}/{temporary_workspace}/notexist/{dir_name}", create_parents=False
+        )
+
+    assert not tosfs.exists(f"{bucket}/{temporary_workspace}/notexist")
+    tosfs.mkdir(f"{bucket}/{temporary_workspace}/notexist/{dir_name}")
+    assert tosfs.exists(f"{bucket}/{temporary_workspace}/notexist/{dir_name}")
+    assert tosfs.isdir(f"{bucket}/{temporary_workspace}/notexist/{dir_name}")
+    assert tosfs.exists(f"{bucket}/{temporary_workspace}/notexist/")
+    assert tosfs.isdir(f"{bucket}/{temporary_workspace}/notexist/")
+
+    tosfs.rmdir(f"{bucket}/{temporary_workspace}/notexist/{dir_name}")
+    tosfs.rmdir(f"{bucket}/{temporary_workspace}/notexist")
+    tosfs.rmdir(f"{bucket}/{temporary_workspace}/{dir_name}")
+    tosfs.rmdir(f"{bucket}/{temporary_workspace}")
+
+
+def test_makedirs(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
+    dir_name = random_path()
+
+    with pytest.raises(FileExistsError):
+        tosfs.makedirs(f"{bucket}/{temporary_workspace}", exist_ok=False)
+
+    tosfs.makedirs(f"{bucket}/{temporary_workspace}", exist_ok=True)
+
+    tosfs.makedirs(f"{bucket}/{temporary_workspace}/{dir_name}")
+    assert tosfs.exists(f"{bucket}/{temporary_workspace}/{dir_name}")
+    assert tosfs.isdir(f"{bucket}/{temporary_workspace}/{dir_name}")
+
+    tosfs.rmdir(f"{bucket}/{temporary_workspace}/{dir_name}")
+    assert not tosfs.exists(f"{bucket}/{temporary_workspace}/{dir_name}")
+
+    tosfs.makedirs(f"{bucket}/{temporary_workspace}/{dir_name}", exist_ok=True)
+    assert tosfs.exists(f"{bucket}/{temporary_workspace}/{dir_name}")
+
+    tosfs.makedirs(f"{bucket}/{temporary_workspace}/{dir_name}", exist_ok=True)
+    assert tosfs.exists(f"{bucket}/{temporary_workspace}/{dir_name}")
+
+    assert not tosfs.exists(f"{bucket}/{temporary_workspace}/notexist")
+    tosfs.makedirs(f"{bucket}/{temporary_workspace}/notexist/{dir_name}")
+    assert tosfs.exists(f"{bucket}/{temporary_workspace}/notexist/{dir_name}")
+    assert tosfs.isdir(f"{bucket}/{temporary_workspace}/notexist/{dir_name}")
+    assert tosfs.exists(f"{bucket}/{temporary_workspace}/notexist/")
+    assert tosfs.isdir(f"{bucket}/{temporary_workspace}/notexist/")
+
+    tosfs.rmdir(f"{bucket}/{temporary_workspace}/notexist/{dir_name}")
+    tosfs.rmdir(f"{bucket}/{temporary_workspace}/notexist")
+    tosfs.rmdir(f"{bucket}/{temporary_workspace}/{dir_name}")
+    tosfs.rmdir(f"{bucket}/{temporary_workspace}")

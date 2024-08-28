@@ -50,9 +50,7 @@ def temporary_workspace(
     tosfs: TosFileSystem, bucket: str
 ) -> Generator[str, None, None]:
     workspace = random_path()
-    # currently, make dir via purely tos python client,
-    # will replace with tosfs.mkdir in the future
-    tosfs.tos_client.put_object(bucket=bucket, key=f"{workspace}/")
+    tosfs.mkdirs(f"{bucket}/{workspace}/")
     yield workspace
     try:
         tosfs.rmdir(f"{bucket}/{workspace}/")

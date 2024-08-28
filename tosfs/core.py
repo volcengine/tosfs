@@ -229,6 +229,74 @@ class TosFileSystem(AbstractFileSystem):
         except Exception as e:
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
 
+    def mkdir(self, path: str, create_parents: bool = True, **kwargs: Any) -> None:
+        """Create directory entry at path.
+
+        For systems that don't have true directories, may create an object for
+        this instance only and not touch the real filesystem
+
+        Parameters
+        ----------
+        path: str
+            location
+        create_parents: bool
+            if True, this is equivalent to ``makedirs``
+        kwargs: Any
+            may be permissions, etc.
+
+        """
+        path = self._strip_protocol(path).rstrip("/") + "/"
+        bucket, key, _ = self._split_path(path)
+        if not key:
+            raise TosfsError(f"Cannot create a bucket {bucket} using mkdir api.")
+
+        try:
+            if create_parents:
+                parent = self._parent(f"{bucket}/{key}".rstrip("/") + "/")
+                if not self.exists(parent):
+                    # here we need to create the parent directory recursively
+                    self.mkdir(parent, create_parents=True)
+                self.tos_client.put_object(bucket, key.rstrip("/") + "/")
+            else:
+                parent = self._parent(path)
+                if not self.exists(parent):
+                    raise FileNotFoundError(
+                        f"Parent directory {parent} does not exist."
+                    )
+                else:
+                    self.tos_client.put_object(bucket, key.rstrip("/") + "/")
+        except tos.exceptions.TosClientError as e:
+            raise e
+        except tos.exceptions.TosServerError as e:
+            raise e
+        except FileNotFoundError as e:
+            raise e
+        except Exception as e:
+            raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
+
+    def makedirs(self, path: str, exist_ok: bool = False) -> None:
+        """Recursively make directories.
+
+        Creates directory at path and any intervening required directories.
+        Raises exception if, for instance, the path already exists but is a
+        file.
+
+        Parameters
+        ----------
+        path: str
+            leaf directory name
+        exist_ok: bool (False)
+            If False, will error if the target already exists
+
+        """
+        path = self._strip_protocol(path).rstrip("/") + "/"
+        if exist_ok and self.exists(path):
+            return
+        if not exist_ok and self.exists(path):
+            raise FileExistsError(path)
+
+        self.mkdir(path, create_parents=True)
+
     def touch(self, path: str, truncate: bool = True, **kwargs: Any) -> None:
         """Create an empty file at the given path.
 
