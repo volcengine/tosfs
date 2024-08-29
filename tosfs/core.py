@@ -14,6 +14,7 @@
 
 """The core module of TOSFS."""
 import logging
+import mimetypes
 import os
 from typing import Any, List, Optional, Tuple, Union
 
@@ -416,6 +417,94 @@ class TosFileSystem(AbstractFileSystem):
         except tos.exceptions.TosServerError as e:
             if e.status_code == TOS_SERVER_RESPONSE_CODE_NOT_FOUND:
                 return False
+            raise e
+        except Exception as e:
+            raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
+
+    def put_file(
+        self,
+        lpath: str,
+        rpath: str,
+        chunksize: int = 5 * 2**20,
+        **kwargs: Any,
+    ) -> None:
+        """Put a file from local to TOS.
+
+        Parameters
+        ----------
+        lpath : str
+            The local path of the file to put.
+        rpath : str
+            The remote path of the file to put.
+        chunksize : int, optional
+            The size of the chunks to read from the file (default is 50 * 2**20).
+        **kwargs : Any, optional
+            Additional arguments.
+
+        Raises
+        ------
+        FileNotFoundError
+            If the local file does not exist.
+        IsADirectoryError
+            If the local path is a directory.
+        TosClientError
+            If there is a client error while putting the file.
+        TosServerError
+            If there is a server error while putting the file.
+        TosfsError
+            If there is an unknown error while putting the file.
+
+        Examples
+        --------
+        >>> fs = TosFileSystem()
+        >>> fs.put_file("localfile.txt", "tos://mybucket/remote.txt")
+
+        """
+        if not os.path.exists(lpath):
+            raise FileNotFoundError(f"Local file {lpath} not found.")
+
+        if os.path.isdir(lpath):
+            raise IsADirectoryError(f"{lpath} is a directory.")
+
+        size = os.path.getsize(lpath)
+
+        content_type = None
+        if "ContentType" not in kwargs:
+            content_type, _ = mimetypes.guess_type(lpath)
+
+        bucket, key, _ = self._split_path(rpath)
+
+        try:
+            if self.isfile(rpath):
+                self.makedirs(self._parent(rpath), exist_ok=True)
+
+            if self.isdir(rpath):
+                rpath = os.path.join(rpath, os.path.basename(lpath))
+
+            bucket, key, _ = self._split_path(rpath)
+
+            with open(lpath, "rb") as f:
+                if size < min(5 * 2**30, 2 * chunksize):
+                    chunk = f.read()
+                    self.tos_client.put_object(
+                        bucket,
+                        key,
+                        content=chunk,
+                        content_type=content_type,
+                    )
+                else:
+                    mpu = self.tos_client.create_multipart_upload(
+                        bucket, key, content_type=content_type
+                    )
+                    self.tos_client.upload_part_from_file(
+                        bucket, key, mpu.upload_id, file_path=lpath, part_number=1
+                    )
+                    self.tos_client.complete_multipart_upload(
+                        bucket, key, mpu.upload_id, complete_all=True
+                    )
+        except tos.exceptions.TosClientError as e:
+            raise e
+        except tos.exceptions.TosServerError as e:
             raise e
         except Exception as e:
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e

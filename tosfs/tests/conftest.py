@@ -19,7 +19,7 @@ import pytest
 from tos import EnvCredentialsProvider
 
 from tosfs.core import TosFileSystem, logger
-from tosfs.utils import random_path
+from tosfs.utils import random_str
 
 
 @pytest.fixture(scope="module")
@@ -49,7 +49,7 @@ def bucket() -> str:
 def temporary_workspace(
     tosfs: TosFileSystem, bucket: str
 ) -> Generator[str, None, None]:
-    workspace = random_path()
+    workspace = random_str()
     tosfs.mkdirs(f"{bucket}/{workspace}/")
     yield workspace
     try:
