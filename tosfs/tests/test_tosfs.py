@@ -341,3 +341,93 @@ def test_get_file(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -
         tosfs.get_file(f"{bucket}/{temporary_workspace}/nonexistent", lpath)
 
     tosfs.rm_file(rpath)
+
+
+###########################################################
+#                File operation tests                     #
+###########################################################
+
+
+def test_file_write(
+    tosfs: TosFileSystem, bucket: str, temporary_workspace: str
+) -> None:
+    file_name = random_str()
+    content = "hello world"
+    with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "w") as f:
+        f.write(content)
+    assert tosfs.info(f"{bucket}/{temporary_workspace}/{file_name}")["size"] == len(
+        content
+    )
+
+    tosfs.touch(f"{bucket}/{temporary_workspace}/{file_name}")
+    with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "wb") as f:
+        f.write(content.encode("utf-8"))
+    assert tosfs.info(f"{bucket}/{temporary_workspace}/{file_name}")["size"] == len(
+        content
+    )
+
+    tosfs.rm_file(f"{bucket}/{temporary_workspace}/{file_name}")
+
+
+def test_file_write_encdec(
+    tosfs: TosFileSystem, bucket: str, temporary_workspace: str
+) -> None:
+    file_name = random_str()
+    content = "你好"
+    with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "wb") as f:
+        f.write(content.encode("gbk"))
+    response = tosfs.tos_client.get_object(
+        bucket=bucket, key=f"{temporary_workspace}/{file_name}"
+    )
+    assert response.read().decode("gbk") == content
+
+    tosfs.touch(f"{bucket}/{temporary_workspace}/{file_name}")
+
+    content = "\u00af\\_(\u30c4)_/\u00af"
+    with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "wb") as f:
+        f.write(content.encode("utf-16-le"))
+    response = tosfs.tos_client.get_object(
+        bucket=bucket, key=f"{temporary_workspace}/{file_name}"
+    )
+    assert response.read().decode("utf-16-le") == content
+
+    with tosfs.open(
+        f"{bucket}/{temporary_workspace}/{file_name}", "w", encoding="utf-8"
+    ) as f:
+        f.write("\u00af\\_(\u30c4)_/\u00af")
+    response = tosfs.tos_client.get_object(
+        bucket=bucket, key=f"{temporary_workspace}/{file_name}"
+    )
+    assert response.read().decode("utf-8") == content
+
+    content = "Hello, World!"
+    with tosfs.open(
+        f"{bucket}/{temporary_workspace}/{file_name}", "w", encoding="ibm500"
+    ) as f:
+        f.write(content)
+    response = tosfs.tos_client.get_object(
+        bucket=bucket, key=f"{temporary_workspace}/{file_name}"
+    )
+    assert response.read().decode("ibm500") == content
+
+    tosfs.rm_file(f"{bucket}/{temporary_workspace}/{file_name}")
+
+
+def test_file_write_mpu(
+    tosfs: TosFileSystem, bucket: str, temporary_workspace: str
+) -> None:
+    file_name = random_str()
+
+    # mock a content let the write logic trigger mpu:
+    content = "a" * 13 * 1024 * 1024
+    block_size = 4 * 1024 * 1024
+    with tosfs.open(
+        f"{bucket}/{temporary_workspace}/{file_name}", "w", block_size=block_size
+    ) as f:
+        f.write(content)
+
+    assert tosfs.info(f"{bucket}/{temporary_workspace}/{file_name}")["size"] == len(
+        content
+    )
+
+    tosfs.rm_file(f"{bucket}/{temporary_workspace}/{file_name}")
