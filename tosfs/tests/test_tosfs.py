@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os.path
+import tempfile
 
 import pytest
 from tos.exceptions import TosServerError
@@ -318,5 +320,24 @@ def test_put_file(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -
         tosfs.tos_client.get_object(bucket, key).content.read()
         == b"a" * 1024 * 1024 * 6
     )
+    tosfs.rm_file(rpath)
+
+
+def test_get_file(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
+    file_name = random_str()
+    file_content = "hello world"
+    rpath = f"{bucket}/{temporary_workspace}/{file_name}"
+    lpath = f"{tempfile.mkdtemp()}/{file_name}"
+    assert not os.path.exists(lpath)
+
+    bucket, key, _ = tosfs._split_path(rpath)
+    tosfs.tos_client.put_object(bucket=bucket, key=key, content=file_content)
+
+    tosfs.get_file(rpath, lpath)
+    with open(lpath, "r") as f:
+        assert f.read() == file_content
+
+    with pytest.raises(FileNotFoundError):
+        tosfs.get_file(f"{bucket}/{temporary_workspace}/nonexistent", lpath)
 
     tosfs.rm_file(rpath)
