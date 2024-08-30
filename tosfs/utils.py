@@ -17,11 +17,12 @@
 import random
 import re
 import string
+import tempfile
 from typing import Tuple
 
 
-def random_path(length: int = 5) -> str:
-    """Generate a random path(dir or file) of the given length.
+def random_str(length: int = 5) -> str:
+    """Generate a random string of the given length.
 
     Args:
     ----
@@ -32,7 +33,18 @@ def random_path(length: int = 5) -> str:
     str: The random string.
 
     """
-    return "".join(random.choices(string.ascii_letters + string.digits, k=length))
+    return "".join(random.choices(string.ascii_letters, k=length))
+
+
+def create_temp_dir() -> str:
+    """Create a temporary directory for testing purposes.
+
+    Returns
+    -------
+    str: The path of the created temporary directory.
+
+    """
+    return tempfile.mkdtemp()
 
 
 def find_bucket_key(tos_path: str) -> Tuple[str, str]:
