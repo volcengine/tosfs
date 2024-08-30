@@ -16,7 +16,8 @@
 import logging
 import mimetypes
 import os
-from typing import Any, List, Optional, Tuple, Union
+import time
+from typing import Any, BinaryIO, List, Optional, Tuple, Union
 
 import tos
 from fsspec import AbstractFileSystem
@@ -55,6 +56,8 @@ class TosFileSystem(AbstractFileSystem):
     It's an implementation of AbstractFileSystem which is an
     abstract super-class for pythonic file-systems.
     """
+
+    retries = 5
 
     def __init__(
         self,
@@ -502,6 +505,113 @@ class TosFileSystem(AbstractFileSystem):
                     self.tos_client.complete_multipart_upload(
                         bucket, key, mpu.upload_id, complete_all=True
                     )
+        except tos.exceptions.TosClientError as e:
+            raise e
+        except tos.exceptions.TosServerError as e:
+            raise e
+        except Exception as e:
+            raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
+
+    def get_file(self, rpath: str, lpath: str, **kwargs: Any) -> None:
+        """Get a file from the TOS filesystem and write to a local path.
+
+           This method will retry the download if there is error.
+
+        Parameters
+        ----------
+        rpath : str
+            The remote path of the file to get.
+        lpath : str
+            The local path to save the file.
+        **kwargs : Any, optional
+            Additional arguments.
+
+        Raises
+        ------
+        FileNotFoundError
+            If the file does not exist.
+        tos.exceptions.TosClientError
+            If there is a client error while getting the file.
+        tos.exceptions.TosServerError
+            If there is a server error while getting the file.
+        TosfsError
+            If there is an unknown error while getting the file.
+
+        """
+        if os.path.isdir(lpath):
+            return
+
+        if not self.exists(rpath):
+            raise FileNotFoundError(rpath)
+
+        bucket, key, version_id = self._split_path(rpath)
+
+        def _read_chunks(body: BinaryIO, f: BinaryIO) -> None:
+            failed_reads = 0
+            bytes_read = 0
+            while True:
+                try:
+                    chunk = body.read(2**16)
+                except tos.exceptions.TosClientError as e:
+                    failed_reads += 1
+                    if failed_reads >= self.retries:
+                        raise e
+                    try:
+                        body.close()
+                    except Exception as e:
+                        logger.error(
+                            "Failed to close the body when calling "
+                            "get_file from %s to %s : %s",
+                            rpath,
+                            lpath,
+                            e,
+                        )
+
+                    time.sleep(min(1.7**failed_reads * 0.1, 15))
+                    body, _ = self._open_remote_file(
+                        bucket, key, version_id, bytes_read, **kwargs
+                    )
+                    continue
+                if not chunk:
+                    break
+                bytes_read += len(chunk)
+                f.write(chunk)
+
+        body, content_length = self._open_remote_file(
+            bucket, key, version_id, range_start=0, **kwargs
+        )
+        try:
+            with open(lpath, "wb") as f:
+                _read_chunks(body, f)
+        finally:
+            try:
+                body.close()
+            except Exception as e:
+                logger.error(
+                    "Failed to close the body when calling "
+                    "get_file from %s to %s: %s",
+                    rpath,
+                    lpath,
+                    e,
+                )
+
+    def _open_remote_file(
+        self,
+        bucket: str,
+        key: str,
+        version_id: Optional[str],
+        range_start: int,
+        **kwargs: Any,
+    ) -> Tuple[BinaryIO, int]:
+        try:
+            resp = self.tos_client.get_object(
+                bucket,
+                key,
+                version_id=version_id,
+                range_start=range_start,
+                **kwargs,
+            )
+            return resp.content, resp.content_length
         except tos.exceptions.TosClientError as e:
             raise e
         except tos.exceptions.TosServerError as e:
