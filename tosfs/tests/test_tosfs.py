@@ -448,7 +448,7 @@ def test_find(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> No
     result = tosfs.find(
         bucket, prefix=temporary_workspace + "/", withdirs=True, detail=True
     )
-    assert len(result) == len(bucket, f"{bucket}/{temporary_workspace}/")
+    assert len(result) == len([bucket, f"{bucket}/{temporary_workspace}/"])
     assert (
         result[f"{bucket}/{temporary_workspace}/"]["name"]
         == f"{bucket}/{temporary_workspace}/"
