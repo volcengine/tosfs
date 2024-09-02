@@ -18,7 +18,7 @@ import logging
 import mimetypes
 import os
 import time
-from typing import Any, BinaryIO, List, Optional, Tuple, Union
+from typing import Any, BinaryIO, Generator, List, Optional, Tuple, Union
 
 import tos
 from fsspec import AbstractFileSystem
@@ -65,6 +65,7 @@ class TosFileSystem(AbstractFileSystem):
     abstract super-class for pythonic file-systems.
     """
 
+    protocol = ("tos", "tosfs")
     retries = 5
     default_block_size = 5 * 2**20
 
@@ -675,6 +676,42 @@ class TosFileSystem(AbstractFileSystem):
                     lpath,
                     e,
                 )
+
+    def walk(
+        self,
+        path: str,
+        maxdepth: Optional[int] = None,
+        topdown: bool = True,
+        on_error: str = "omit",
+        **kwargs: Any,
+    ) -> Generator[str, List[str], List[str]]:
+        """List objects under the given path.
+
+        Parameters
+        ----------
+        path : str
+            The path to list.
+        maxdepth : int, optional
+            The maximum depth to walk to (default is None).
+        topdown : bool, optional
+            Whether to walk top-down or bottom-up (default is True).
+        on_error : str, optional
+            How to handle errors (default is 'omit').
+        **kwargs : Any, optional
+            Additional arguments.
+
+        Raises
+        ------
+        ValueError
+            If the path is an invalid path.
+
+        """
+        if path in ["", "*"] + ["{}://".format(p) for p in self.protocol]:
+            raise ValueError("Cannot access all of TOS via path {}.".format(path))
+
+        return super().walk(
+            path, maxdepth=maxdepth, topdown=topdown, on_error=on_error, **kwargs
+        )
 
     def _open_remote_file(
         self,
