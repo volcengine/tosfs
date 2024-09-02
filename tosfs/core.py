@@ -713,6 +713,93 @@ class TosFileSystem(AbstractFileSystem):
             path, maxdepth=maxdepth, topdown=topdown, on_error=on_error, **kwargs
         )
 
+    def find(
+        self,
+        path: str,
+        maxdepth: Optional[int] = None,
+        withdirs: bool = False,
+        detail: bool = False,
+        prefix: str = "",
+        **kwargs: Any,
+    ) -> Union[List[str], dict]:
+        """Find all files or dirs with conditions.
+
+        Like posix ``find`` command without conditions
+
+        Parameters
+        ----------
+        path : str
+            The path to search.
+        maxdepth: int, optional
+            If not None, the maximum number of levels to descend
+        withdirs: bool
+            Whether to include directory paths in the output. This is True
+            when used by glob, but users usually only want files.
+        prefix: str
+            Only return files that match ``^{path}/{prefix}`` (if there is an
+            exact match ``filename == {path}/{prefix}``, it also will be included)
+        detail: bool
+            If True, return a dict with file information, else just the path
+        **kwargs: Any
+            Additional arguments.
+
+        """
+        if path in ["", "*"] + ["{}://".format(p) for p in self.protocol]:
+            raise ValueError("Cannot access all of TOS via path {}.".format(path))
+
+        path = self._strip_protocol(path)
+        bucket, key, _ = self._split_path(path)
+        if not bucket:
+            raise ValueError("Cannot access all of TOS without specify a bucket.")
+
+        if maxdepth and prefix:
+            raise ValueError(
+                "Can not specify 'prefix' option alongside 'maxdepth' options."
+            )
+        if maxdepth:
+            return super().find(
+                bucket + "/" + key,
+                maxdepth=maxdepth,
+                withdirs=withdirs,
+                detail=detail,
+                **kwargs,
+            )
+
+        out = self._find_file_dir(key, path, prefix, withdirs, kwargs)
+
+        if detail:
+            return {o["name"]: o for o in out}
+        else:
+            return [o["name"] for o in out]
+
+    def _find_file_dir(
+        self, key: str, path: str, prefix: str, withdirs: bool, kwargs: Any
+    ) -> List[dict]:
+        out = self._lsdir(
+            path, delimiter="", include_self=True, prefix=prefix, **kwargs
+        )
+        if not out and key:
+            try:
+                out = [self.info(path)]
+            except FileNotFoundError:
+                out = []
+        dirs = []
+        for o in out:
+            par = self._parent(o["name"])
+            if len(path) <= len(par):
+                d = {
+                    "Key": self._split_path(par)[1],
+                    "Size": 0,
+                    "name": par,
+                    "type": "directory",
+                }
+                dirs.append(d)
+        if withdirs:
+            out = sorted(out + dirs, key=lambda x: x["name"])
+        else:
+            out = [o for o in out if o["type"] == "file"]
+        return out
+
     def _open_remote_file(
         self,
         bucket: str,
@@ -1059,6 +1146,7 @@ class TosFileSystem(AbstractFileSystem):
         max_items: int = 1000,
         delimiter: str = "/",
         prefix: str = "",
+        include_self: bool = False,
         versions: bool = False,
     ) -> List[dict]:
         """List objects in a directory.
@@ -1073,6 +1161,8 @@ class TosFileSystem(AbstractFileSystem):
             The delimiter to use for grouping objects (default is '/').
         prefix : str, optional
             The prefix to use for filtering objects (default is '').
+        include_self : bool, optional
+            Whether to include the directory itself in the listing (default is False).
         versions : bool, optional
             Whether to list object versions (default is False).
 
@@ -1107,12 +1197,15 @@ class TosFileSystem(AbstractFileSystem):
             max_items=max_items,
             delimiter=delimiter,
             prefix=prefix,
+            include_self=include_self,
             versions=versions,
         ):
             if isinstance(obj, CommonPrefixInfo):
-                dirs.append(self._fill_common_prefix_info(obj, bucket))
+                dirs.append(self._fill_dir_info(bucket, obj))
+            elif obj.key.endswith("/"):
+                dirs.append(self._fill_dir_info(bucket, None, obj.key))
             else:
-                files.append(self._fill_object_info(obj, bucket, versions))
+                files.append(self._fill_file_info(obj, bucket, versions))
         files += dirs
 
         return files
@@ -1123,6 +1216,7 @@ class TosFileSystem(AbstractFileSystem):
         max_items: int = 1000,
         delimiter: str = "/",
         prefix: str = "",
+        include_self: bool = False,
         versions: bool = False,
     ) -> List[Union[CommonPrefixInfo, ListedObject, ListedObjectVersion]]:
         """List objects in a bucket.
@@ -1137,6 +1231,8 @@ class TosFileSystem(AbstractFileSystem):
             The delimiter to use for grouping objects (default is '/').
         prefix : str, optional
             The prefix to use for filtering objects (default is '').
+        include_self : bool, optional
+            Whether to include the bucket itself in the listing (default is False).
         versions : bool, optional
             Whether to list object versions (default is False).
 
@@ -1194,7 +1290,7 @@ class TosFileSystem(AbstractFileSystem):
                     resp = self.tos_client.list_objects_type2(
                         bucket,
                         prefix,
-                        start_after=prefix,
+                        start_after=prefix if not include_self else None,
                         delimiter=delimiter,
                         max_keys=max_items,
                         continuation_token=continuation_token,
@@ -1255,8 +1351,10 @@ class TosFileSystem(AbstractFileSystem):
         )
 
     @staticmethod
-    def _fill_common_prefix_info(common_prefix: CommonPrefixInfo, bucket: str) -> dict:
-        name = "/".join([bucket, common_prefix.prefix[:-1]])
+    def _fill_dir_info(
+        bucket: str, common_prefix: Optional[CommonPrefixInfo], key: str = ""
+    ) -> dict:
+        name = "/".join([bucket, common_prefix.prefix[:-1] if common_prefix else key])
         return {
             "name": name,
             "Key": name,
@@ -1265,9 +1363,7 @@ class TosFileSystem(AbstractFileSystem):
         }
 
     @staticmethod
-    def _fill_object_info(
-        obj: ListedObject, bucket: str, versions: bool = False
-    ) -> dict:
+    def _fill_file_info(obj: ListedObject, bucket: str, versions: bool = False) -> dict:
         result = {
             "Key": f"{bucket}/{obj.key}",
             "size": obj.size,
