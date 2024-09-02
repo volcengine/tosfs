@@ -343,6 +343,79 @@ def test_get_file(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -
     tosfs.rm_file(rpath)
 
 
+def test_walk(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
+    with pytest.raises(ValueError, match="Cannot access all of TOS via path ."):
+        tosfs.walk(path="")
+
+    with pytest.raises(ValueError, match="Cannot access all of TOS via path *."):
+        tosfs.walk(path="*")
+
+    with pytest.raises(ValueError, match="Cannot access all of TOS via path tos://."):
+        tosfs.walk("tos://")
+
+    for root, dirs, files in list(tosfs.walk("/", maxdepth=1)):
+        assert root == ""
+        assert len(dirs) > 0
+        assert files == []
+
+    for root, dirs, files in tosfs.walk(bucket, maxdepth=1):
+        assert root == bucket
+        assert len(dirs) > 0
+        assert len(files) > 0
+
+    dir_name = random_str()
+    sub_dir_name = random_str()
+    file_name = random_str()
+    sub_file_name = random_str()
+
+    tosfs.makedirs(f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}")
+    tosfs.touch(f"{bucket}/{temporary_workspace}/{dir_name}/{file_name}")
+    tosfs.touch(
+        f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}/{sub_file_name}"
+    )
+
+    walk_results = list(tosfs.walk(f"{bucket}/{temporary_workspace}"))
+
+    assert walk_results[0][0] == f"{bucket}/{temporary_workspace}"
+    assert dir_name in walk_results[0][1]
+    assert walk_results[0][2] == []
+
+    assert walk_results[1][0] == f"{bucket}/{temporary_workspace}/{dir_name}"
+    assert sub_dir_name in walk_results[1][1]
+    assert file_name in walk_results[1][2]
+
+    assert (
+        walk_results[2][0]
+        == f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}"
+    )
+    assert walk_results[2][1] == []
+    assert sub_file_name in walk_results[2][2]
+
+    walk_results = list(tosfs.walk(f"{bucket}/{temporary_workspace}", topdown=False))
+    assert (
+        walk_results[0][0]
+        == f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}"
+    )
+    assert walk_results[0][1] == []
+    assert sub_file_name in walk_results[0][2]
+
+    assert walk_results[1][0] == f"{bucket}/{temporary_workspace}/{dir_name}"
+    assert sub_dir_name in walk_results[1][1]
+    assert file_name in walk_results[1][2]
+
+    assert walk_results[2][0] == f"{bucket}/{temporary_workspace}"
+    assert dir_name in walk_results[2][1]
+    assert walk_results[2][2] == []
+
+    tosfs.rm_file(
+        f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}/{sub_file_name}"
+    )
+    tosfs.rm_file(f"{bucket}/{temporary_workspace}/{dir_name}/{file_name}")
+    tosfs.rmdir(f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}")
+    tosfs.rmdir(f"{bucket}/{temporary_workspace}/{dir_name}")
+    tosfs.rmdir(f"{bucket}/{temporary_workspace}")
+
+
 ###########################################################
 #                File operation tests                     #
 ###########################################################
