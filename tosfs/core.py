@@ -35,7 +35,7 @@ from tos.models2 import (
 
 from tosfs.consts import TOS_SERVER_RESPONSE_CODE_NOT_FOUND
 from tosfs.exceptions import TosfsError
-from tosfs.utils import find_bucket_key
+from tosfs.utils import find_bucket_key, retryable_func_wrapper
 
 # environment variable names
 ENV_NAME_TOSFS_LOGGING_LEVEL = "TOSFS_LOGGING_LEVEL"
@@ -1555,6 +1555,26 @@ class TosFile(AbstractBufferedFile):
                     if self.parts is not None
                     else None
                 )
+
+    def _fetch_range(self, start: int, end: int) -> bytes:
+        bucket, key, version_id = self.fs._split_path(self.path)
+        if start == end:
+            logger.debug(
+                "skip fetch for negative range - bucket=%s,key=%s,start=%d,end=%d",
+                bucket,
+                key,
+                start,
+                end,
+            )
+            return b""
+        logger.debug("Fetch: %s/%s, %s-%s", bucket, key, start, end)
+
+        def fetch() -> bytes:
+            return self.fs.tos_client.get_object(
+                bucket, key, version_id, range_start=start, range_end=end
+            ).read()
+
+        return retryable_func_wrapper(fetch, retries=self.fs.retries)
 
     def commit(self) -> None:
         """Complete multipart upload or PUT."""

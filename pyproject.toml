@@ -67,6 +67,7 @@ ignore = [
     "D213", # multi-line-summary-second-line
     "PLR0913", # Too many arguments in function definition
     "SIM105", # Use `contextlib.suppress(IOError)` instead of `try`-`except`-`pass`
+    "PERF203", # `try`-`except` within a loop incurs performance overhead
 ]
 
 [tool.ruff.lint.per-file-ignores]

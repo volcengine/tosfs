@@ -575,3 +575,75 @@ def test_file_write_mpu(
     )
 
     tosfs.rm_file(f"{bucket}/{temporary_workspace}/{file_name}")
+
+
+def test_file_read(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
+    file_name = random_str()
+    content = "hello world"
+    with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "w") as f:
+        f.write(content)
+
+    with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "r") as f:
+        assert f.read() == content
+
+    with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "rb") as f:
+        assert f.read().decode() == content
+
+    tosfs.rm_file(f"{bucket}/{temporary_workspace}/{file_name}")
+
+
+def test_file_read_encdec(
+    tosfs: TosFileSystem, bucket: str, temporary_workspace: str
+) -> None:
+    file_name = random_str()
+    content = "你好"
+    with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "wb") as f:
+        f.write(content.encode("gbk"))
+
+    with tosfs.open(
+        f"{bucket}/{temporary_workspace}/{file_name}", "r", encoding="gbk"
+    ) as f:
+        assert f.read() == content
+
+    tosfs.rm_file(f"{bucket}/{temporary_workspace}/{file_name}")
+
+    content = "\u00af\\_(\u30c4)_/\u00af"
+    with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "wb") as f:
+        f.write(content.encode("utf-16-le"))
+
+    with tosfs.open(
+        f"{bucket}/{temporary_workspace}/{file_name}", "r", encoding="utf-16-le"
+    ) as f:
+        assert f.read() == content
+
+    tosfs.rm_file(f"{bucket}/{temporary_workspace}/{file_name}")
+
+    content = "Hello, World!"
+    with tosfs.open(
+        f"{bucket}/{temporary_workspace}/{file_name}", "w", encoding="ibm500"
+    ) as f:
+        f.write(content)
+
+    with tosfs.open(
+        f"{bucket}/{temporary_workspace}/{file_name}", "r", encoding="ibm500"
+    ) as f:
+        assert f.read() == content
+
+    tosfs.rm_file(f"{bucket}/{temporary_workspace}/{file_name}")
+
+
+def test_file_readlines(
+    tosfs: TosFileSystem, bucket: str, temporary_workspace: str
+) -> None:
+    file_name = random_str()
+    content = "hello\nworld"
+    with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "w") as f:
+        f.write(content)
+
+    with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "r") as f:
+        assert f.readlines() == ["hello\n", "world"]
+
+    with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "rb") as f:
+        assert f.readlines() == [b"hello\n", b"world"]
+
+    tosfs.rm_file(f"{bucket}/{temporary_workspace}/{file_name}")
