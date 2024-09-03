@@ -18,7 +18,12 @@ import random
 import re
 import string
 import tempfile
-from typing import Tuple
+import time
+from typing import Any, Optional, Tuple
+
+import tos
+
+from tosfs.consts import TOS_SERVER_RETRYABLE_ERROR_CODE_SET
 
 
 def random_str(length: int = 5) -> str:
@@ -84,3 +89,34 @@ def find_bucket_key(tos_path: str) -> Tuple[str, str]:
     if len(tos_components) > 1:
         tos_key = tos_components[1]
     return bucket, tos_key
+
+
+def retryable_func_wrapper(
+    func: Any, *, args: tuple[()] = (), kwargs: Optional[Any] = None, retries: int = 5
+) -> Any:
+    """Retry a function in case of server errors."""
+    if kwargs is None:
+        kwargs = {}
+
+    err = None
+
+    for i in range(retries):
+        try:
+            return func(*args, **kwargs)
+        except tos.exceptions.TosServerError as e:
+            err = e
+            from tosfs.core import logger
+
+            logger.debug("Server error (maybe retryable): %s", e)
+            if e.code in TOS_SERVER_RETRYABLE_ERROR_CODE_SET:
+                time.sleep(min(1.7**i * 0.1, 15))
+            else:
+                break
+        except Exception as e:
+            err = e
+            from tosfs.core import logger
+
+            logger.debug("Nonretryable error: %s", e)
+            break
+
+    raise err if err is not None else ""

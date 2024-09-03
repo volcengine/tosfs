@@ -16,3 +16,13 @@
 
 # Tos server response codes
 TOS_SERVER_RESPONSE_CODE_NOT_FOUND = 404
+
+TOS_SERVER_RETRYABLE_ERROR_CODE_SET = {
+    "IncompleteBody",
+    "ExceedAccountQPSLimit",
+    "ExceedAccountRateLimit",
+    "ExceedBucketQPSLimit",
+    "ExceedBucketRateLimit",
+    "InternalError",
+    "ServiceUnavailable",
+}
