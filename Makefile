@@ -7,17 +7,18 @@ help:             ## Show the help.
 	@echo "Usage: make <target>"
 	@echo ""
 	@echo "Targets:"
-	@echo "help:             ## Show the help."
-	@echo "show:             ## Show the current environment."
-	@echo "install:          ## Install the project in dev mode."
-	@echo "fmt:              ## Format code using black & isort."
-	@echo "lint:             ## Run pep8, black, mypy linters."
-	@echo "test: lint        ## Run tests and generate coverage report."
-	@echo "watch:            ## Run tests on every change."
-	@echo "clean:            ## Clean unused files."
-	@echo "release:          ## Create a new tag for release."
-	@echo "docs:             ## Build the documentation."
-	@echo "release_wheel:    ## Release wheel for python client."
+	@echo "help:             	## Show the help."
+	@echo "show:             	## Show the current environment."
+	@echo "install:          	## Install the project in dev mode."
+	@echo "fmt:              	## Format code using black & isort."
+	@echo "lint:             	## Run pep8, black, mypy linters."
+	@echo "test: lint        	## Run tests and generate coverage report."
+	@echo "test_compatibility: 	## Run compatibility tests."
+	@echo "watch:            	## Run tests on every change."
+	@echo "clean:            	## Clean unused files."
+	@echo "release:          	## Create a new tag for release."
+	@echo "docs:             	## Build the documentation."
+	@echo "release_wheel:    	## Release wheel for python client."
 
 .PHONY: show
 show:             ## Show the current environment.
@@ -47,7 +48,11 @@ lint:             ## Run pep8, black, mypy linters.
 
 .PHONY: test
 test:             ## Run tests and generate coverage report.
-	$(ENV_PREFIX)pytest -vv -s --cov-config .coveragerc --cov=tosfs -l --tb=short --maxfail=1 ${TEST_DIR}
+	$(ENV_PREFIX)pytest -vv -s --cov-config .coveragerc --cov=tosfs -l --tb=short --maxfail=1 ${TEST_DIR} --ignore=${TEST_DIR}/test_fsspec.py
+
+.PHONY: test_compatibility
+test_compatibility:             ## Run compatibility tests.
+	$(ENV_PREFIX)pytest -vv -s -l --tb=short --maxfail=1 ${TEST_DIR} ${TEST_DIR}/test_fsspec.py
 
 .PHONY: watch
 watch:            ## Run tests on every change.
