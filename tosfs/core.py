@@ -1311,6 +1311,9 @@ class TosFileSystem(AbstractFileSystem):
     def _rm(self, path: str) -> None:
         bucket, key, _ = self._split_path(path)
 
+        if path.endswith("/") or self.isdir(path):
+            key = key.rstrip("/") + "/"
+
         try:
             self.tos_client.delete_object(bucket, key)
         except tos.exceptions.TosClientError as e:

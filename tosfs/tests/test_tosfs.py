@@ -63,8 +63,6 @@ def test_inner_rm(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -
 
     assert tosfs.ls(f"{bucket}/{temporary_workspace}", detail=False) == []
 
-    tosfs._rm(f"{bucket}/{temporary_workspace}/{file_name}")
-
 
 def test_info(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
     assert tosfs.info("") == {"name": "", "size": 0, "type": "directory"}
@@ -134,7 +132,6 @@ def test_touch(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> N
     assert tosfs.info(f"{bucket}/{temporary_workspace}/{file_name}")["size"] > 0
     tosfs.touch(f"{bucket}/{temporary_workspace}/{file_name}", truncate=True)
     assert tosfs.info(f"{bucket}/{temporary_workspace}/{file_name}")["size"] == 0
-    tosfs.rm_file(f"{bucket}/{temporary_workspace}/{file_name}")
 
 
 def test_isdir(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
@@ -151,8 +148,6 @@ def test_isdir(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> N
     assert not tosfs.isdir(f"{bucket}/{temporary_workspace}/{file_name}")
     assert not tosfs.isdir(f"{bucket}/{temporary_workspace}/{file_name}/")
 
-    tosfs._rm(f"{bucket}/{temporary_workspace}/{file_name}")
-
 
 def test_isfile(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
     file_name = random_str()
@@ -162,8 +157,6 @@ def test_isfile(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> 
     assert not tosfs.isfile(f"{bucket}/{temporary_workspace}/nonexistfile")
     assert not tosfs.isfile(f"{bucket}/{temporary_workspace}")
     assert not tosfs.isfile(f"{bucket}/{temporary_workspace}/")
-
-    tosfs._rm(f"{bucket}/{temporary_workspace}/{file_name}")
 
 
 def test_exists_bucket(
@@ -224,11 +217,6 @@ def test_mkdir(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> N
     assert tosfs.exists(f"{bucket}/{temporary_workspace}/notexist/")
     assert tosfs.isdir(f"{bucket}/{temporary_workspace}/notexist/")
 
-    tosfs.rmdir(f"{bucket}/{temporary_workspace}/notexist/{dir_name}")
-    tosfs.rmdir(f"{bucket}/{temporary_workspace}/notexist")
-    tosfs.rmdir(f"{bucket}/{temporary_workspace}/{dir_name}")
-    tosfs.rmdir(f"{bucket}/{temporary_workspace}")
-
 
 def test_makedirs(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
     dir_name = random_str()
@@ -257,11 +245,6 @@ def test_makedirs(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -
     assert tosfs.isdir(f"{bucket}/{temporary_workspace}/notexist/{dir_name}")
     assert tosfs.exists(f"{bucket}/{temporary_workspace}/notexist/")
     assert tosfs.isdir(f"{bucket}/{temporary_workspace}/notexist/")
-
-    tosfs.rmdir(f"{bucket}/{temporary_workspace}/notexist/{dir_name}")
-    tosfs.rmdir(f"{bucket}/{temporary_workspace}/notexist")
-    tosfs.rmdir(f"{bucket}/{temporary_workspace}/{dir_name}")
-    tosfs.rmdir(f"{bucket}/{temporary_workspace}")
 
 
 def test_put_file(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
@@ -320,7 +303,6 @@ def test_put_file(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -
         tosfs.tos_client.get_object(bucket, key).content.read()
         == b"a" * 1024 * 1024 * 6
     )
-    tosfs.rm_file(rpath)
 
 
 def test_get_file(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
@@ -339,8 +321,6 @@ def test_get_file(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -
 
     with pytest.raises(FileNotFoundError):
         tosfs.get_file(f"{bucket}/{temporary_workspace}/nonexistent", lpath)
-
-    tosfs.rm_file(rpath)
 
 
 def test_walk(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
@@ -406,14 +386,6 @@ def test_walk(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> No
     assert walk_results[2][0] == f"{bucket}/{temporary_workspace}"
     assert dir_name in walk_results[2][1]
     assert walk_results[2][2] == []
-
-    tosfs.rm_file(
-        f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}/{sub_file_name}"
-    )
-    tosfs.rm_file(f"{bucket}/{temporary_workspace}/{dir_name}/{file_name}")
-    tosfs.rmdir(f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}")
-    tosfs.rmdir(f"{bucket}/{temporary_workspace}/{dir_name}")
-    tosfs.rmdir(f"{bucket}/{temporary_workspace}")
 
 
 def test_find(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
@@ -510,8 +482,6 @@ def test_file_write(
         content
     )
 
-    tosfs.rm_file(f"{bucket}/{temporary_workspace}/{file_name}")
-
 
 def test_file_write_encdec(
     tosfs: TosFileSystem, bucket: str, temporary_workspace: str
@@ -554,8 +524,6 @@ def test_file_write_encdec(
     )
     assert response.read().decode("ibm500") == content
 
-    tosfs.rm_file(f"{bucket}/{temporary_workspace}/{file_name}")
-
 
 def test_file_write_mpu(
     tosfs: TosFileSystem, bucket: str, temporary_workspace: str
@@ -574,8 +542,6 @@ def test_file_write_mpu(
         content
     )
 
-    tosfs.rm_file(f"{bucket}/{temporary_workspace}/{file_name}")
-
 
 def test_file_read(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
     file_name = random_str()
@@ -588,8 +554,6 @@ def test_file_read(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) 
 
     with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "rb") as f:
         assert f.read().decode() == content
-
-    tosfs.rm_file(f"{bucket}/{temporary_workspace}/{file_name}")
 
 
 def test_file_read_encdec(
@@ -629,8 +593,6 @@ def test_file_read_encdec(
     ) as f:
         assert f.read() == content
 
-    tosfs.rm_file(f"{bucket}/{temporary_workspace}/{file_name}")
-
 
 def test_file_readlines(
     tosfs: TosFileSystem, bucket: str, temporary_workspace: str
@@ -645,5 +607,3 @@ def test_file_readlines(
 
     with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "rb") as f:
         assert f.readlines() == [b"hello\n", b"world"]
-
-    tosfs.rm_file(f"{bucket}/{temporary_workspace}/{file_name}")

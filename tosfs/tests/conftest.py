@@ -53,7 +53,7 @@ def temporary_workspace(
     tosfs.mkdirs(f"{bucket}/{workspace}/")
     yield workspace
     try:
-        tosfs.rmdir(f"{bucket}/{workspace}/")
+        tosfs.rm(f"{bucket}/{workspace}/", recursive=True)
     except Exception as e:
         logger.error(f"Ignore exception : {e}.")
     assert not tosfs.exists(f"{bucket}/{workspace}/")
