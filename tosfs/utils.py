@@ -19,7 +19,7 @@ import re
 import string
 import tempfile
 import time
-from typing import Any, Optional, Tuple
+from typing import Any, Generator, Optional, Tuple
 
 import tos
 
@@ -89,6 +89,21 @@ def find_bucket_key(tos_path: str) -> Tuple[str, str]:
     if len(tos_components) > 1:
         tos_key = tos_components[1]
     return bucket, tos_key
+
+
+def get_brange(size: int, block: int) -> Generator[Tuple[int, int], None, None]:
+    """Chunk up a file into zero-based byte ranges.
+
+    Parameters
+    ----------
+    size : int
+        file size
+    block : int
+        block size
+
+    """
+    for offset in range(0, size, block):
+        yield offset, min(offset + block - 1, size - 1)
 
 
 def retryable_func_wrapper(

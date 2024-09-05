@@ -26,3 +26,9 @@ TOS_SERVER_RETRYABLE_ERROR_CODE_SET = {
     "InternalError",
     "ServiceUnavailable",
 }
+
+MANAGED_COPY_THRESHOLD = 5 * 2**30
+
+RETRY_NUM = 5
+PART_MIN_SIZE = 5 * 2**20
+PART_MAX_SIZE = 5 * 2**30
