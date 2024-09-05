@@ -49,7 +49,8 @@ def test_copy(fsspecfs: Any, bucket: str, temporary_workspace: str):
     ), "Content mismatch in copied file"
 
     # Test Case 2: Copy directory recursively
-    copy_dir_dest = f"{bucket}/{temporary_workspace}/copy_dir"
+    copy_dir_dest = f"{bucket}/{temporary_workspace}/copy_dir/"
+    fsspecfs.mkdir(copy_dir_dest)
     fsspecfs.copy(subdir_path, copy_dir_dest, recursive=True)
     assert fsspecfs.exists(
         f"{copy_dir_dest}/file1.txt"
