@@ -818,6 +818,7 @@ class TosFileSystem(AbstractFileSystem):
             If there is a server error while copying the file.
         TosfsError
             If there is an unknown error while copying the file.
+
         """
         path1 = self._strip_protocol(path1)
         bucket, key, vers = self._split_path(path1)
@@ -872,10 +873,7 @@ class TosFileSystem(AbstractFileSystem):
     def _copy_etag_preserved(
         self, path1: str, path2: str, size: int, total_parts: int, **kwargs: Any
     ) -> None:
-        """Copy file between tos locations as multiple-part while preserving the etag.
-
-        (using the same part sizes for each part
-        """
+        """Copy file as multiple-part while preserving the etag."""
         bucket1, key1, version1 = self._split_path(path1)
         bucket2, key2, version2 = self._split_path(path2)
 
@@ -922,15 +920,21 @@ class TosFileSystem(AbstractFileSystem):
             raise TosfsError(f"Copy failed ({path1} -> {path2}): {e}") from e
 
     def _copy_managed(
-        self, path1: str, path2: str, size: int, block: int = 5 * 2**30, **kwargs: Any
+        self,
+        path1: str,
+        path2: str,
+        size: int,
+        block: int = MANAGED_COPY_THRESHOLD,
+        **kwargs: Any,
     ) -> None:
         """Copy file between locations on tos as multiple-part.
 
         block: int
-            The size of the pieces, must be larger than 5MB and at most 5GB.
+            The size of the pieces, must be larger than 5MB and at
+            most MANAGED_COPY_THRESHOLD.
             Smaller blocks mean more calls, only useful for testing.
         """
-        if block < 5 * 2**20 or block > 5 * 2**30:
+        if block < 5 * 2**20 or block > MANAGED_COPY_THRESHOLD:
             raise ValueError("Copy block size must be 5MB<=block<=5GB")
 
         bucket1, key1, version1 = self._split_path(path1)
@@ -1592,6 +1596,7 @@ class TosFileSystem(AbstractFileSystem):
             "type": "directory",
             "name": bucket_name,
         }
+
 
 class TosFile(AbstractBufferedFile):
     """File-like operations for TOS."""
