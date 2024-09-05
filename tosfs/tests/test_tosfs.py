@@ -459,6 +459,50 @@ def test_find(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> No
     tosfs.rmdir(f"{bucket}/{temporary_workspace}")
 
 
+def test_cp_file(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
+    file_name = random_str()
+    file_content = "hello world"
+    src_path = f"{bucket}/{temporary_workspace}/{file_name}"
+    dest_path = f"{bucket}/{temporary_workspace}/copy_{file_name}"
+
+    with tosfs.open(src_path, "w") as f:
+        f.write(file_content)
+
+    tosfs.cp_file(src_path, dest_path)
+    assert tosfs.exists(dest_path)
+
+    with tosfs.open(dest_path, "r") as f:
+        assert f.read() == file_content
+
+    with pytest.raises(FileNotFoundError):
+        tosfs.cp_file(f"{bucket}/{temporary_workspace}/nonexistent", dest_path)
+
+    sub_dir_name = random_str()
+    dest_path = f"{bucket}/{temporary_workspace}/{sub_dir_name}"
+    tosfs.cp_file(src_path, dest_path)
+    assert tosfs.exists(dest_path)
+    with tosfs.open(dest_path, "r") as f:
+        assert f.read() == file_content
+
+    file_content = "a" * 2048  # 2KB content
+    with tosfs.open(src_path, "w") as f:
+        f.write(file_content)
+
+    tosfs.cp_file(src_path, dest_path, managed_copy_threshold=1024)
+    assert tosfs.exists(dest_path)
+
+    with tosfs.open(dest_path, "r") as f:
+        assert f.read() == file_content
+
+    # Test cp_file with preserve_etag=True
+    dest_path_with_etag = f"{bucket}/{temporary_workspace}/etag_{file_name}"
+    tosfs.cp_file(dest_path, dest_path_with_etag, preserve_etag=True)
+    assert tosfs.exists(dest_path_with_etag)
+    with tosfs.open(dest_path_with_etag, "r") as f:
+        assert f.read() == file_content
+    assert tosfs.info(dest_path_with_etag)["ETag"] == tosfs.info(dest_path)["ETag"]
+
+
 ###########################################################
 #                File operation tests                     #
 ###########################################################
