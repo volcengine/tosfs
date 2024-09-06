@@ -18,6 +18,7 @@ import logging
 import mimetypes
 import os
 import time
+from glob import has_magic
 from typing import Any, BinaryIO, Generator, List, Optional, Tuple, Union
 
 import tos
@@ -497,6 +498,9 @@ class TosFileSystem(AbstractFileSystem):
             return False
 
         bucket, key, _ = self._split_path(path)
+        if not key:
+            return False
+
         try:
             # Attempt to get the object metadata
             self.tos_client.head_object(bucket, key)
@@ -776,6 +780,68 @@ class TosFileSystem(AbstractFileSystem):
         else:
             return [o["name"] for o in out]
 
+    def expand_path(
+        self,
+        path: Union[str, List[str]],
+        recursive: bool = False,
+        maxdepth: Optional[int] = None,
+    ) -> List[str]:
+        """Expand path to a list of files.
+
+        Parameters
+        ----------
+        path : str
+            The path to expand.
+        recursive : bool, optional
+            Whether to expand recursively (default is False).
+        maxdepth : int, optional
+            The maximum depth to expand to (default is None).
+        **kwargs : Any, optional
+            Additional arguments.
+
+        Returns
+        -------
+        List[str]
+            A list of expanded paths.
+
+        """
+        if maxdepth is not None and maxdepth < 1:
+            raise ValueError("maxdepth must be at least 1")
+
+        if isinstance(path, str):
+            return self.expand_path([path], recursive, maxdepth)
+
+        out = set()
+        path = [self._strip_protocol(p) for p in path]
+        for p in path:  # can gather here
+            if has_magic(p):
+                bit = set(self.glob(p, maxdepth=maxdepth))
+                out |= bit
+                if recursive:
+                    # glob call above expanded one depth so if maxdepth is defined
+                    # then decrement it in expand_path call below. If it is zero
+                    # after decrementing then avoid expand_path call.
+                    if maxdepth is not None and maxdepth <= 1:
+                        continue
+                    out |= set(
+                        self.expand_path(
+                            list(bit),
+                            recursive=recursive,
+                            maxdepth=maxdepth - 1 if maxdepth is not None else None,
+                        )
+                    )
+                continue
+            elif recursive:
+                rec = set(self.find(p, maxdepth=maxdepth, withdirs=True))
+                out |= rec
+            if p not in out and (recursive is False or self.exists(p)):
+                # should only check once, for the root
+                out.add(p)
+
+        if not out:
+            raise FileNotFoundError(path)
+        return sorted(out)
+
     def cp_file(
         self,
         path1: str,
@@ -992,9 +1058,9 @@ class TosFileSystem(AbstractFileSystem):
             par = self._parent(o["name"])
             if len(path) <= len(par):
                 d = {
-                    "Key": self._split_path(par)[1],
+                    "Key": self._split_path(par)[1].rstrip("/"),
                     "Size": 0,
-                    "name": par,
+                    "name": par.rstrip("/"),
                     "type": "directory",
                 }
                 dirs.append(d)
@@ -1204,13 +1270,10 @@ class TosFileSystem(AbstractFileSystem):
         # if the path is a bucket
         if not key:
             return self._exists_bucket(bucket)
+        elif self.isfile(path):
+            return self._exists_object(bucket, key, path, version_id)
         else:
-            object_exists = self._exists_object(bucket, key, path, version_id)
-            if not object_exists:
-                return self._exists_object(
-                    bucket, key.rstrip("/") + "/", path, version_id
-                )
-            return object_exists
+            return self._exists_object(bucket, key.rstrip("/") + "/", path, version_id)
 
     def _exists_bucket(self, bucket: str) -> bool:
         """Check if a bucket exists in the TOS.
@@ -1561,7 +1624,9 @@ class TosFileSystem(AbstractFileSystem):
     def _fill_dir_info(
         bucket: str, common_prefix: Optional[CommonPrefixInfo], key: str = ""
     ) -> dict:
-        name = "/".join([bucket, common_prefix.prefix[:-1] if common_prefix else key])
+        name = "/".join(
+            [bucket, common_prefix.prefix[:-1] if common_prefix else key]
+        ).rstrip("/")
         return {
             "name": name,
             "Key": name,

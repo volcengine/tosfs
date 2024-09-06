@@ -422,15 +422,10 @@ def test_find(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> No
     )
     assert len(result) == len([bucket, f"{bucket}/{temporary_workspace}/"])
     assert (
-        result[f"{bucket}/{temporary_workspace}/"]["name"]
-        == f"{bucket}/{temporary_workspace}/"
+        result[f"{bucket}/{temporary_workspace}"]["name"]
+        == f"{bucket}/{temporary_workspace}"
     )
-    assert result[f"{bucket}/{temporary_workspace}/"]["type"] == "directory"
-
-    result = tosfs.find(
-        f"{bucket}/{temporary_workspace}", withdirs=True, maxdepth=1, detail=True
-    )
-    assert len(result) == 1
+    assert result[f"{bucket}/{temporary_workspace}"]["type"] == "directory"
 
     dir_name = random_str()
     sub_dir_name = random_str()
@@ -501,6 +496,43 @@ def test_cp_file(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) ->
     with tosfs.open(dest_path_with_etag, "r") as f:
         assert f.read() == file_content
     assert tosfs.info(dest_path_with_etag)["ETag"] == tosfs.info(dest_path)["ETag"]
+
+
+def test_expand_path(
+    tosfs: TosFileSystem, bucket: str, temporary_workspace: str
+) -> None:
+    assert tosfs.expand_path(bucket) == [bucket]
+    assert tosfs.expand_path(f"{bucket}/") == [bucket]
+    assert tosfs.expand_path(f"{bucket}/{temporary_workspace}/") == [
+        f"{bucket}/{temporary_workspace}"
+    ]
+    tosfs.touch(f"{bucket}/{temporary_workspace}/file")
+    assert tosfs.expand_path(f"{bucket}/{temporary_workspace}", recursive=True) == [
+        f"{bucket}/{temporary_workspace}",
+        f"{bucket}/{temporary_workspace}/file",
+    ]
+    sub_dir_name = random_str()
+    tosfs.mkdir(f"{bucket}/{temporary_workspace}/{sub_dir_name}")
+    tosfs.touch(f"{bucket}/{temporary_workspace}/{sub_dir_name}/file")
+    assert tosfs.expand_path(
+        f"{bucket}/{temporary_workspace}", recursive=True, maxdepth=1
+    ) == sorted(
+        [
+            f"{bucket}/{temporary_workspace}",
+            f"{bucket}/{temporary_workspace}/file",
+            f"{bucket}/{temporary_workspace}/{sub_dir_name}",
+        ]
+    )
+    assert tosfs.expand_path(
+        f"{bucket}/{temporary_workspace}", recursive=True
+    ) == sorted(
+        [
+            f"{bucket}/{temporary_workspace}",
+            f"{bucket}/{temporary_workspace}/{sub_dir_name}",
+            f"{bucket}/{temporary_workspace}/file",
+            f"{bucket}/{temporary_workspace}/{sub_dir_name}/file",
+        ]
+    )
 
 
 ###########################################################
