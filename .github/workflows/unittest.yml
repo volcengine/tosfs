@@ -8,6 +8,7 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
+        fsspec-version: ["2023.5.0", "2024.9.0"]
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
@@ -19,7 +20,9 @@ jobs:
         set -x
         python -m pip install --upgrade pip
         pip install --user poetry
-        make install
+        poetry lock
+        poetry install --with dev
+        poetry add fsspec==${{ matrix.fsspec-version }}
     - name: Prepare Env
       run: |
         echo "Preparing environment variables"
