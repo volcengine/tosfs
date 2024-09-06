@@ -23,6 +23,7 @@ jobs:
         poetry lock
         poetry install --with dev
         poetry add fsspec==${{ matrix.fsspec-version }}
+        poetry show fsspec
     - name: Prepare Env
       run: |
         echo "Preparing environment variables"
