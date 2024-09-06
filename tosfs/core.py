@@ -891,6 +891,10 @@ class TosFileSystem(AbstractFileSystem):
         bucket, key, vers = self._split_path(path1)
 
         info = self.info(path1, bucket, key, version_id=vers)
+        if info["type"] == "directory":
+            logger.warning(f"Do not support copy directory {path1}.")
+            return
+
         size = info["size"]
 
         _, _, parts_suffix = info.get("ETag", "").strip('"').partition("-")
