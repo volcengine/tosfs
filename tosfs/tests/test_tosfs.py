@@ -598,23 +598,24 @@ def test_glob(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> No
     )
 
     # Test with maxdepth
-    assert (sorted(
-        tosfs.glob(f"{bucket}/{temporary_workspace}/**", maxdepth=2)
-    ) == sorted(
-        [
-            f"{bucket}/{temporary_workspace}/{dir_name}",
-            f"{bucket}/{temporary_workspace}/{dir_name}/{file_name}",
-            f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}",
-        ]
-    ) if fsspec_version == "2023.5.0" else
-            sorted(
-                [
-                    f"{bucket}/{temporary_workspace}",
-                    f"{bucket}/{temporary_workspace}/{dir_name}",
-                    f"{bucket}/{temporary_workspace}/{dir_name}/{file_name}",
-                    f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}",
-                ]
-            )
+    assert (
+        sorted(tosfs.glob(f"{bucket}/{temporary_workspace}/**", maxdepth=2))
+        == sorted(
+            [
+                f"{bucket}/{temporary_workspace}/{dir_name}",
+                f"{bucket}/{temporary_workspace}/{dir_name}/{file_name}",
+                f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}",
+            ]
+        )
+        if fsspec_version == "2023.5.0"
+        else sorted(
+            [
+                f"{bucket}/{temporary_workspace}",
+                f"{bucket}/{temporary_workspace}/{dir_name}",
+                f"{bucket}/{temporary_workspace}/{dir_name}/{file_name}",
+                f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}",
+            ]
+        )
     )
 
     # Test with detail
