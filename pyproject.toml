@@ -83,6 +83,18 @@ ignore = [
     #D107 Missing docstring in __init__
     "D107"
 ]
+"tosfs/fsspec_utils.py" = [
+    #SIM108 Use ternary operator xxx instead of `if`-`else`-block
+    "SIM108",
+    #N803 Argument name should be lowercase
+    "N803",
+    #PLR0915 Too many statements
+    "PLR0915",
+    #PLR0912 Too many branches
+    "PLR0912",
+    #C901 is too complex
+    "C901",
+]
 
 [tool.mypy]
 python_version = "3.9"
@@ -90,7 +102,10 @@ ignore_missing_imports = true
 disallow_untyped_calls = true
 disallow_untyped_defs = true
 strict_optional = true
-exclude = "tosfs/tests/.*"
+exclude = [
+    "tosfs/tests/.*",
+    "tosfs/fsspec_utils.py"
+]
 
 [build-system]
 requires = ["poetry-core"]

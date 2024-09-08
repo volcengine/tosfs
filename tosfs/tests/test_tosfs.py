@@ -535,6 +535,86 @@ def test_expand_path(
     )
 
 
+def test_glob(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
+    dir_name = random_str()
+    sub_dir_name = random_str()
+    file_name = random_str()
+    sub_file_name = random_str()
+    nested_file_name = random_str()
+
+    tosfs.makedirs(f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}")
+    tosfs.touch(f"{bucket}/{temporary_workspace}/{dir_name}/{file_name}")
+    tosfs.touch(
+        f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}/{sub_file_name}"
+    )
+    tosfs.touch(
+        f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}/{nested_file_name}"
+    )
+
+    # Test invalid inputs
+    with pytest.raises(ValueError, match="Cannot traverse all of tosfs"):
+        tosfs.glob("*")
+
+    with pytest.raises(ValueError, match="maxdepth must be at least 1"):
+        tosfs.glob(f"{bucket}/{temporary_workspace}", maxdepth=0)
+
+    # Test valid inputs
+    # No wildcards
+    assert tosfs.glob(f"{bucket}/{temporary_workspace}/{dir_name}/{file_name}") == [
+        f"{bucket}/{temporary_workspace}/{dir_name}/{file_name}"
+    ]
+
+    # Single wildcard *
+    assert sorted(tosfs.glob(f"{bucket}/{temporary_workspace}/{dir_name}/*")) == sorted(
+        [
+            f"{bucket}/{temporary_workspace}/{dir_name}/{file_name}",
+            f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}",
+        ]
+    )
+
+    # Single character wildcard ?
+    assert tosfs.glob(
+        f"{bucket}/{temporary_workspace}/{dir_name}/{file_name[:-1]}?"
+    ) == [f"{bucket}/{temporary_workspace}/{dir_name}/{file_name}"]
+
+    # Character class wildcard []
+    assert tosfs.glob(
+        f"{bucket}/{temporary_workspace}/{dir_name}/{file_name[:-1]}[{file_name[-1]}]"
+    ) == [f"{bucket}/{temporary_workspace}/{dir_name}/{file_name}"]
+
+    # Recursive wildcard **
+    assert sorted(tosfs.glob(f"{bucket}/{temporary_workspace}/**")) == sorted(
+        [
+            f"{bucket}/{temporary_workspace}",
+            f"{bucket}/{temporary_workspace}/{dir_name}",
+            f"{bucket}/{temporary_workspace}/{dir_name}/{file_name}",
+            f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}",
+            f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}/{sub_file_name}",
+            f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}/{nested_file_name}",
+        ]
+    )
+
+    # Test with maxdepth
+    assert sorted(
+        tosfs.glob(f"{bucket}/{temporary_workspace}/**", maxdepth=2)
+    ) == sorted(
+        [
+            f"{bucket}/{temporary_workspace}/{dir_name}",
+            f"{bucket}/{temporary_workspace}/{dir_name}/{file_name}",
+            f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}",
+        ]
+    )
+
+    # Test with detail
+    result = tosfs.glob(f"{bucket}/{temporary_workspace}/**", detail=True)
+    assert isinstance(result, dict)
+    assert f"{bucket}/{temporary_workspace}/{dir_name}/{file_name}" in result
+    assert (
+        result[f"{bucket}/{temporary_workspace}/{dir_name}/{file_name}"]["type"]
+        == "file"
+    )
+
+
 ###########################################################
 #                File operation tests                     #
 ###########################################################

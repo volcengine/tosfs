@@ -19,7 +19,7 @@ import mimetypes
 import os
 import time
 from glob import has_magic
-from typing import Any, BinaryIO, Generator, List, Optional, Tuple, Union
+from typing import Any, BinaryIO, Collection, Generator, List, Optional, Tuple, Union
 
 import tos
 from fsspec import AbstractFileSystem
@@ -41,6 +41,7 @@ from tosfs.consts import (
     TOS_SERVER_RESPONSE_CODE_NOT_FOUND,
 )
 from tosfs.exceptions import TosfsError
+from tosfs.fsspec_utils import glob_translate
 from tosfs.utils import find_bucket_key, get_brange, retryable_func_wrapper
 
 # environment variable names
@@ -911,6 +912,80 @@ class TosFileSystem(AbstractFileSystem):
 
             # serial multipart copy
             self._copy_managed(path1, path2, size, **kwargs)
+
+    def glob(
+        self, path: str, maxdepth: Optional[int] = None, **kwargs: Any
+    ) -> Collection[Any]:
+        """Return list of paths matching a glob-like pattern.
+
+        Parameters
+        ----------
+        path : str
+            The path to search.
+        maxdepth : int, optional
+            The maximum depth to search to (default is None).
+        **kwargs : Any, optional
+            Additional arguments.
+
+        """
+        if path.startswith("*"):
+            raise ValueError("Cannot traverse all of tosfs")
+
+        if maxdepth is not None and maxdepth < 1:
+            raise ValueError("maxdepth must be at least 1")
+
+        import re
+
+        seps = (os.path.sep, os.path.altsep) if os.path.altsep else (os.path.sep,)
+        ends_with_sep = path.endswith(seps)  # _strip_protocol strips trailing slash
+        path = self._strip_protocol(path)
+        append_slash_to_dirname = ends_with_sep or path.endswith(
+            tuple(sep + "**" for sep in seps)
+        )
+
+        idx_star = path.find("*") if path.find("*") >= 0 else len(path)
+        idx_qmark = path.find("?") if path.find("?") >= 0 else len(path)
+        idx_brace = path.find("[") if path.find("[") >= 0 else len(path)
+        min_idx = min(idx_star, idx_qmark, idx_brace)
+
+        detail = kwargs.pop("detail", False)
+
+        if not has_magic(path):
+            if self.exists(path, **kwargs):
+                return {path: self.info(path, **kwargs)} if detail else [path]
+            return {} if detail else []
+
+        depth: Optional[int] = None
+        root, depth = "", path[min_idx + 1 :].count("/") + 1
+        if "/" in path[:min_idx]:
+            min_idx = path[:min_idx].rindex("/")
+            root = path[: min_idx + 1]
+
+        if "**" in path:
+            if maxdepth is not None:
+                idx_double_stars = path.find("**")
+                depth_double_stars = path[idx_double_stars:].count("/") + 1
+                depth = depth - depth_double_stars + maxdepth
+            else:
+                depth = None
+
+        allpaths = self.find(root, maxdepth=depth, withdirs=True, detail=True, **kwargs)
+        pattern = re.compile(glob_translate(path + ("/" if ends_with_sep else "")))
+
+        if isinstance(allpaths, dict):
+            out = {
+                p: info
+                for p, info in sorted(allpaths.items())
+                if pattern.match(
+                    p + "/"
+                    if append_slash_to_dirname and info["type"] == "directory"
+                    else p
+                )
+            }
+        else:
+            out = {}
+
+        return out if detail else list(out)
 
     def _copy_basic(self, path1: str, path2: str, **kwargs: Any) -> None:
         """Copy file between locations on tos.
