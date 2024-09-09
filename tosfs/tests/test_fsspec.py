@@ -347,40 +347,68 @@ def test_walk(fsspecfs: Any, bucket: str, temporary_workspace: str):
         f.write(b"File 3 content")
 
     # Test walk with maxdepth=None and topdown=True
-    result = list(fsspecfs.walk(f"{bucket}/{temporary_workspace}", maxdepth=None, topdown=True))
+    result = list(
+        fsspecfs.walk(f"{bucket}/{temporary_workspace}", maxdepth=None, topdown=True)
+    )
     expected = [
-        (fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}"), ["nested_dir_1"], ["file_1.txt"]),
+        (
+            fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}"),
+            ["nested_dir_1"],
+            ["file_1.txt"],
+        ),
         (fsspecfs._strip_protocol(nested_dir_1), ["nested_dir_2"], ["file_2.txt"]),
         (fsspecfs._strip_protocol(nested_dir_2), [], ["file_3.txt"]),
     ]
     assert result == expected, f"Expected {expected}, got {result}"
 
     # Test walk with maxdepth=1 and topdown=True
-    result = list(fsspecfs.walk(f"{bucket}/{temporary_workspace}", maxdepth=1, topdown=True))
+    result = list(
+        fsspecfs.walk(f"{bucket}/{temporary_workspace}", maxdepth=1, topdown=True)
+    )
     expected = [
-        (fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}"), ["nested_dir_1"], ["file_1.txt"]),
+        (
+            fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}"),
+            ["nested_dir_1"],
+            ["file_1.txt"],
+        ),
     ]
     assert result == expected, f"Expected {expected}, got {result}"
 
     # Test walk with maxdepth=2 and topdown=True
-    result = list(fsspecfs.walk(f"{bucket}/{temporary_workspace}", maxdepth=2, topdown=True))
+    result = list(
+        fsspecfs.walk(f"{bucket}/{temporary_workspace}", maxdepth=2, topdown=True)
+    )
     expected = [
-        (fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}"), ["nested_dir_1"], ["file_1.txt"]),
+        (
+            fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}"),
+            ["nested_dir_1"],
+            ["file_1.txt"],
+        ),
         (fsspecfs._strip_protocol(nested_dir_1), ["nested_dir_2"], ["file_2.txt"]),
     ]
     assert result == expected, f"Expected {expected}, got {result}"
 
     # Test walk with maxdepth=None and topdown=False
-    result = list(fsspecfs.walk(f"{bucket}/{temporary_workspace}", maxdepth=None, topdown=False))
+    result = list(
+        fsspecfs.walk(f"{bucket}/{temporary_workspace}", maxdepth=None, topdown=False)
+    )
     expected = [
         (fsspecfs._strip_protocol(nested_dir_2), [], ["file_3.txt"]),
         (fsspecfs._strip_protocol(nested_dir_1), ["nested_dir_2"], ["file_2.txt"]),
-        (fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}"), ["nested_dir_1"], ["file_1.txt"]),
+        (
+            fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}"),
+            ["nested_dir_1"],
+            ["file_1.txt"],
+        ),
     ]
     assert result == expected, f"Expected {expected}, got {result}"
 
     # Test walk with detail=True
-    result = list(fsspecfs.walk(f"{bucket}/{temporary_workspace}", maxdepth=None, topdown=True, detail=True))
+    result = list(
+        fsspecfs.walk(
+            f"{bucket}/{temporary_workspace}", maxdepth=None, topdown=True, detail=True
+        )
+    )
     expected_dir_num = 3
     assert (
         len(result) == expected_dir_num
@@ -518,30 +546,13 @@ def test_du(fsspecfs: Any, bucket: str, temporary_workspace: str):
     assert sizes == expected_sizes, f"Expected sizes {expected_sizes}, got {sizes}"
 
     # Test maxdepth
-    sizes_maxdepth_1 = fsspecfs.du(f"{bucket}/{temporary_workspace}", total=False, maxdepth=2)
+    sizes_maxdepth_1 = fsspecfs.du(
+        f"{bucket}/{temporary_workspace}", total=False, maxdepth=2
+    )
     expected_sizes_maxdepth_1 = {fsspecfs._strip_protocol(file_path): 13}
     assert (
         sizes_maxdepth_1 == expected_sizes_maxdepth_1
     ), f"Expected sizes {expected_sizes_maxdepth_1}, got {sizes_maxdepth_1}"
-
-    # Test withdirs=True
-    # sizes_withdirs = fsspecfs.du(f"{bucket}/{temporary_workspace}", total=False, withdirs=True)
-    # expected_sizes_withdirs = {
-    #     fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}"): 27,
-    #     fsspecfs._strip_protocol(dir_path): 27,
-    #     fsspecfs._strip_protocol(file_path): 13,
-    #     fsspecfs._strip_protocol(nested_dir_path): 14,
-    #     fsspecfs._strip_protocol(nested_file_path): 14,
-    # }
-    # assert (
-    #     sizes_withdirs == expected_sizes_withdirs
-    # ), f"Expected sizes {expected_sizes_withdirs}, got {sizes_withdirs}"
-
-    # total_sizes_withdirs = fsspecfs.du(f"{bucket}/{temporary_workspace}", total=True, withdirs=True)
-    # expected_total_sizes_withdirs = 95
-    # assert (
-    #     total_sizes_withdirs == expected_total_sizes_withdirs
-    # ), f"Expected sizes {expected_total_sizes_withdirs}, got {total_sizes_withdirs}"
 
 
 def test_isdir(fsspecfs: Any, bucket: str, temporary_workspace: str):

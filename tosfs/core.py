@@ -892,7 +892,7 @@ class TosFileSystem(AbstractFileSystem):
 
         info = self.info(path1, bucket, key, version_id=vers)
         if info["type"] == "directory":
-            logger.warning(f"Do not support copy directory {path1}.")
+            logger.warning("Do not support copy directory %s.", path1)
             return
 
         size = info["size"]
