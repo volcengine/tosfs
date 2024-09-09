@@ -13,7 +13,6 @@
 # limitations under the License.
 
 """The module contains utility functions for the tosfs package."""
-
 import random
 import re
 import string
