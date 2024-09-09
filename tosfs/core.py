@@ -1700,6 +1700,17 @@ class TosFile(AbstractBufferedFile):
         self.append_block = False
         self.buffer: Optional[io.BytesIO] = io.BytesIO()
 
+        if "a" in mode and fs.exists(path):
+            head = self.fs.tos_client.head_object(bucket, key)
+            loc = head.content_length
+
+            if loc < 5 * 2**20:
+                # existing file too small for multi-upload: download
+                self.write(self.fs.cat(self.path))
+            else:
+                self.append_block = True
+            self.loc = loc
+
     def _initiate_upload(self) -> None:
         """Create remote file/upload."""
         if self.autocommit and not self.append_block and self.tell() < self.blocksize:
