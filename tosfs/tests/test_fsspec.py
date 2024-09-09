@@ -331,8 +331,6 @@ def test_write_read_without_protocol(
 
 
 def test_walk(fsspecfs: Any, bucket: str, temporary_workspace: str):
-    sub_dir_name = "".join(random.choices(string.ascii_letters + string.digits, k=10))
-    temp_folder = f"{bucket}/{temporary_workspace}/{sub_dir_name}"
     nested_dir_1 = f"{bucket}/{temporary_workspace}/nested_dir_1"
     nested_dir_2 = f"{nested_dir_1}/nested_dir_2"
     file_1 = f"{bucket}/{temporary_workspace}/file_1.txt"
@@ -349,40 +347,40 @@ def test_walk(fsspecfs: Any, bucket: str, temporary_workspace: str):
         f.write(b"File 3 content")
 
     # Test walk with maxdepth=None and topdown=True
-    result = list(fsspecfs.walk(temp_folder, maxdepth=None, topdown=True))
+    result = list(fsspecfs.walk(f"{bucket}/{temporary_workspace}", maxdepth=None, topdown=True))
     expected = [
-        (fsspecfs._strip_protocol(temp_folder), ["nested_dir_1"], ["file_1.txt"]),
+        (fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}"), ["nested_dir_1"], ["file_1.txt"]),
         (fsspecfs._strip_protocol(nested_dir_1), ["nested_dir_2"], ["file_2.txt"]),
         (fsspecfs._strip_protocol(nested_dir_2), [], ["file_3.txt"]),
     ]
     assert result == expected, f"Expected {expected}, got {result}"
 
     # Test walk with maxdepth=1 and topdown=True
-    result = list(fsspecfs.walk(temp_folder, maxdepth=1, topdown=True))
+    result = list(fsspecfs.walk(f"{bucket}/{temporary_workspace}", maxdepth=1, topdown=True))
     expected = [
-        (fsspecfs._strip_protocol(temp_folder), ["nested_dir_1"], ["file_1.txt"]),
+        (fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}"), ["nested_dir_1"], ["file_1.txt"]),
     ]
     assert result == expected, f"Expected {expected}, got {result}"
 
     # Test walk with maxdepth=2 and topdown=True
-    result = list(fsspecfs.walk(temp_folder, maxdepth=2, topdown=True))
+    result = list(fsspecfs.walk(f"{bucket}/{temporary_workspace}", maxdepth=2, topdown=True))
     expected = [
-        (fsspecfs._strip_protocol(temp_folder), ["nested_dir_1"], ["file_1.txt"]),
+        (fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}"), ["nested_dir_1"], ["file_1.txt"]),
         (fsspecfs._strip_protocol(nested_dir_1), ["nested_dir_2"], ["file_2.txt"]),
     ]
     assert result == expected, f"Expected {expected}, got {result}"
 
     # Test walk with maxdepth=None and topdown=False
-    result = list(fsspecfs.walk(temp_folder, maxdepth=None, topdown=False))
+    result = list(fsspecfs.walk(f"{bucket}/{temporary_workspace}", maxdepth=None, topdown=False))
     expected = [
         (fsspecfs._strip_protocol(nested_dir_2), [], ["file_3.txt"]),
         (fsspecfs._strip_protocol(nested_dir_1), ["nested_dir_2"], ["file_2.txt"]),
-        (fsspecfs._strip_protocol(temp_folder), ["nested_dir_1"], ["file_1.txt"]),
+        (fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}"), ["nested_dir_1"], ["file_1.txt"]),
     ]
     assert result == expected, f"Expected {expected}, got {result}"
 
     # Test walk with detail=True
-    result = list(fsspecfs.walk(temp_folder, maxdepth=None, topdown=True, detail=True))
+    result = list(fsspecfs.walk(f"{bucket}/{temporary_workspace}", maxdepth=None, topdown=True, detail=True))
     expected_dir_num = 3
     assert (
         len(result) == expected_dir_num
@@ -400,8 +398,6 @@ def test_find(fsspecfs: Any, bucket: str, temporary_workspace: str):
                     del data[key]["last_modification_time_ms"]
         return data
 
-    sub_dir_name = "".join(random.choices(string.ascii_letters + string.digits, k=10))
-    temp_folder = f"{bucket}/{temporary_workspace}/{sub_dir_name}"
     file1_path = f"{bucket}/{temporary_workspace}/file1"
     file2_path = f"{bucket}/{temporary_workspace}/file2"
     dir1_path = f"{bucket}/{temporary_workspace}/dir1"
@@ -418,7 +414,7 @@ def test_find(fsspecfs: Any, bucket: str, temporary_workspace: str):
     fsspecfs.touch(file4_path)
 
     # Test finding all files
-    result = fsspecfs.find(temp_folder)
+    result = fsspecfs.find(f"{bucket}/{temporary_workspace}")
     expected = [
         fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}/dir1/file3"),
         fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}/dir2/file4"),
@@ -428,7 +424,7 @@ def test_find(fsspecfs: Any, bucket: str, temporary_workspace: str):
     assert result == expected, f"Expected {expected}, got {result}"
 
     # Test finding files with maxdepth=1
-    result = fsspecfs.find(temp_folder, maxdepth=1)
+    result = fsspecfs.find(f"{bucket}/{temporary_workspace}", maxdepth=1)
     expected = [
         fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}/file1"),
         fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}/file2"),
@@ -436,8 +432,9 @@ def test_find(fsspecfs: Any, bucket: str, temporary_workspace: str):
     assert result == expected, f"Expected {expected}, got {result}"
 
     # Test finding files and directories
-    result = fsspecfs.find(temp_folder, withdirs=True)
+    result = fsspecfs.find(f"{bucket}/{temporary_workspace}", withdirs=True)
     expected = [
+        fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}"),
         fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}/dir1"),
         fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}/dir1/file3"),
         fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}/dir2"),
@@ -445,13 +442,16 @@ def test_find(fsspecfs: Any, bucket: str, temporary_workspace: str):
         fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}/file1"),
         fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}/file2"),
     ]
-    assert result == expected, f"Expected {expected}, got {result}"
+    assert sorted(result) == sorted(expected), f"Expected {expected}, got {result}"
 
     # Test finding files with detail=True
-    result = fsspecfs.find(temp_folder, detail=True)
+    result = fsspecfs.find(f"{bucket}/{temporary_workspace}", detail=True)
     result = remove_last_modification_time_ms(result)
     expected = {
         fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}/dir1/file3"): {
+            "Key": fsspecfs._strip_protocol(
+                f"{bucket}/{temporary_workspace}/dir1/file3"
+            ),
             "name": fsspecfs._strip_protocol(
                 f"{bucket}/{temporary_workspace}/dir1/file3"
             ),
@@ -459,6 +459,9 @@ def test_find(fsspecfs: Any, bucket: str, temporary_workspace: str):
             "size": 0,
         },
         fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}/dir2/file4"): {
+            "Key": fsspecfs._strip_protocol(
+                f"{bucket}/{temporary_workspace}/dir2/file4"
+            ),
             "name": fsspecfs._strip_protocol(
                 f"{bucket}/{temporary_workspace}/dir2/file4"
             ),
@@ -466,11 +469,13 @@ def test_find(fsspecfs: Any, bucket: str, temporary_workspace: str):
             "size": 0,
         },
         fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}/file1"): {
+            "Key": fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}/file1"),
             "name": fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}/file1"),
             "type": "file",
             "size": 0,
         },
         fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}/file2"): {
+            "Key": fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}/file2"),
             "name": fsspecfs._strip_protocol(f"{bucket}/{temporary_workspace}/file2"),
             "type": "file",
             "size": 0,

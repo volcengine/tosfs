@@ -1132,22 +1132,25 @@ class TosFileSystem(AbstractFileSystem):
                 out = [self.info(path)]
             except FileNotFoundError:
                 out = []
-        dirs = []
-        for o in out:
-            par = self._parent(o["name"])
-            if len(path) <= len(par):
-                d = {
-                    "Key": self._split_path(par)[1].rstrip("/"),
-                    "Size": 0,
-                    "name": par.rstrip("/"),
-                    "type": "directory",
-                }
-                dirs.append(d)
+        dirs = {
+            self._parent(o["name"]): {
+                "Key": self._parent(o["name"]).rstrip("/"),
+                "Size": 0,
+                "name": self._parent(o["name"]).rstrip("/"),
+                "type": "directory",
+            }
+            for o in out
+            if len(path) <= len(self._parent(o["name"]))
+        }
+
         if withdirs:
-            out = sorted(out + dirs, key=lambda x: x["name"])
+            for dir_info in dirs.values():
+                if dir_info not in out:
+                    out.append(dir_info)
         else:
             out = [o for o in out if o["type"] == "file"]
-        return out
+
+        return sorted(out, key=lambda x: x["name"])
 
     def _open_remote_file(
         self,
