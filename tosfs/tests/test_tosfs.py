@@ -712,6 +712,22 @@ def test_file_write_mpu(
     )
 
 
+def test_file_write_append(
+    tosfs: TosFileSystem, bucket: str, temporary_workspace: str
+) -> None:
+    file_name = random_str()
+    content = "hello world"
+    with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "w") as f:
+        f.write(content)
+    with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "a") as f:
+        f.write(content)
+    assert tosfs.info(f"{bucket}/{temporary_workspace}/{file_name}")["size"] == 2 * len(
+        content
+    )
+    with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "r") as f:
+        assert f.read() == content + content
+
+
 def test_file_read(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
     file_name = random_str()
     content = "hello world"
