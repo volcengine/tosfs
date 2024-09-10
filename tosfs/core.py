@@ -46,6 +46,7 @@ from tosfs.consts import (
     PUT_OBJECT_OPERATION_SMALL_FILE_THRESHOLD,
     RETRY_NUM,
     TOS_SERVER_RESPONSE_CODE_NOT_FOUND,
+    TOSFS_LOG_FORMAT,
 )
 from tosfs.exceptions import TosfsError
 from tosfs.fsspec_utils import glob_translate
@@ -59,6 +60,18 @@ def setup_logging() -> None:
     setup_logger(
         logger=logger,
         level=os.environ.get(ENV_NAME_TOSFS_LOGGING_LEVEL, "INFO"),
+    )
+
+    formatter = logging.Formatter(TOSFS_LOG_FORMAT)
+    for handler in logger.handlers:
+        handler.setFormatter(formatter)
+
+    # set and config tos client's logger
+    tos.set_logger(
+        name="tosclient",
+        level=os.environ.get(ENV_NAME_TOSFS_LOGGING_LEVEL, "INFO"),
+        log_handler=logging.StreamHandler(),
+        format_string=TOSFS_LOG_FORMAT,
     )
 
 
@@ -1663,6 +1676,7 @@ class TosFileSystem(AbstractFileSystem):
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
 
     def _rm(self, path: str) -> None:
+        logger.info("Removing path: %s", path)
         bucket, key, _ = self._split_path(path)
 
         if path.endswith("/") or self.isdir(path):
