@@ -13,9 +13,11 @@
 # limitations under the License.
 
 import os
-from typing import Generator
+from typing import Any, Generator
 
+import fsspec
 import pytest
+from fsspec.registry import known_implementations
 from tos import EnvCredentialsProvider
 
 from tosfs.core import TosFileSystem, logger
@@ -38,6 +40,19 @@ def tosfs(_tosfs_env_prepare: None) -> TosFileSystem:
         credentials_provider=EnvCredentialsProvider(),
     )
     return tosfs
+
+
+@pytest.fixture(scope="module")
+def fsspecfs(_tosfs_env_prepare: None) -> Any:
+    known_implementations["tos"] = {"class": "tosfs.core.TosFileSystem"}
+
+    fsspecfs, _ = fsspec.core.url_to_fs(
+        "tos://",
+        endpoint_url=os.environ.get("TOS_ENDPOINT"),
+        region=os.environ.get("TOS_REGION"),
+        credentials_provider=EnvCredentialsProvider(),
+    )
+    return fsspecfs
 
 
 @pytest.fixture(scope="module")
