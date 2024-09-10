@@ -43,3 +43,4 @@ LS_OPERATION_DEFAULT_MAX_ITEMS = 1000
 
 # environment variable names
 ENV_NAME_TOSFS_LOGGING_LEVEL = "TOSFS_LOGGING_LEVEL"
+TOSFS_LOG_FORMAT = "%(asctime)s %(name)s [%(levelname)s] %(funcName)s : %(message)s"
