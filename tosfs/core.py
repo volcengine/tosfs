@@ -116,7 +116,11 @@ class TosFileSystem(AbstractFileSystem):
         connection_time : int, optional
             The time to keep a connection open (default is 10).
         socket_timeout : int, optional
-            The socket read and write timeout time for a single request after a connection is successfully established, in seconds. The default is 30 seconds. Reference: https://requests.readthedocs.io/en/latest/user/quickstart/#timeouts (default is 30).
+            The socket read and write timeout time for a single request after
+            a connection is successfully established, in seconds.
+            The default is 30 seconds.
+            Reference: https://requests.readthedocs.io/en/latest/user/quickstart/
+            #timeouts (default is 30).
         high_latency_log_threshold : int, optional
             The threshold for logging high latency operations. When greater than 0,
             it represents enabling high-latency logs. The unit is KB.
