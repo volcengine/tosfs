@@ -97,6 +97,11 @@ class TosFileSystem(AbstractFileSystem):
         key: str = "",
         secret: str = "",
         region: Optional[str] = None,
+        max_retry_count: int = 20,
+        max_connections: int = 1024,
+        connection_time: int = 10,
+        socket_timeout: int = 30,
+        high_latency_log_threshold: int = 100,
         version_aware: bool = False,
         credentials_provider: Optional[object] = None,
         default_block_size: Optional[int] = None,
@@ -104,12 +109,62 @@ class TosFileSystem(AbstractFileSystem):
         default_cache_type: str = "readahead",
         **kwargs: Any,
     ) -> None:
-        """Initialise the TosFileSystem."""
+        """Initialise the TosFileSystem.
+
+        Parameters
+        ----------
+        endpoint_url : str, optional
+            The endpoint URL of the TOS service.
+        key : str
+            The access key ID(ak) to access the TOS service.
+        secret : str
+            The secret access key(sk) to access the TOS service.
+        region : str, optional
+            The region of the TOS service.
+        max_retry_count : int, optional
+            The maximum number of retries for a failed request (default is 20).
+        max_connections : int, optional
+            The maximum number of HTTP connections that can be opened in the
+            connection pool (default is 1024).
+        connection_time : int, optional
+            The time to keep a connection open (default is 10).
+        socket_timeout : int, optional
+            The socket read and write timeout time for a single request after
+            a connection is successfully established, in seconds.
+            The default is 30 seconds.
+            Reference: https://requests.readthedocs.io/en/latest/user/quickstart/
+            #timeouts (default is 30).
+        high_latency_log_threshold : int, optional
+            The threshold for logging high latency operations. When greater than 0,
+            it represents enabling high-latency logs. The unit is KB.
+            By default, it is 100.
+            When the total transmission rate of a single request is lower than
+            this value and the total request time is greater than 500 milliseconds,
+            WARN-level logs are printed.
+        version_aware : bool, optional
+            Whether the filesystem is version aware (default is False).
+        credentials_provider : object, optional
+            The credentials provider for the TOS service.
+        default_block_size : int, optional
+            The default block size for reading and writing (default is None).
+        default_fill_cache : bool, optional
+            Whether to fill the cache (default is True).
+        default_cache_type : str, optional
+            The default cache type (default is 'readahead').
+        kwargs : Any, optional
+            Additional arguments.
+
+        """
         self.tos_client = tos.TosClientV2(
             key,
             secret,
             endpoint_url,
             region,
+            max_retry_count=max_retry_count,
+            max_connections=max_connections,
+            connection_time=connection_time,
+            socket_timeout=socket_timeout,
+            high_latency_log_threshold=high_latency_log_threshold,
             credentials_provider=credentials_provider,
         )
         self.version_aware = version_aware
