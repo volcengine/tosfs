@@ -92,5 +92,5 @@ docs:             ## Build the documentation.
 .PHONY: release_wheel
 release_wheel:      ## Release wheel for python client.
 	@echo "Releasing wheel for python client ..."
-	@$(ENV_PREFIX)pip install setuptools wheel twine
-	@$(ENV_PREFIX)python setup.py sdist bdist_wheel
+	pip install poetry
+	poetry build
