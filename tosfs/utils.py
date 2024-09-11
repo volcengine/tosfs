@@ -20,7 +20,7 @@ import tempfile
 import time
 from typing import Any, Generator, Optional, Tuple
 
-import tos
+from tos.exceptions import TosServerError
 
 from tosfs.consts import TOS_SERVER_RETRYABLE_ERROR_CODE_SET
 
@@ -117,7 +117,7 @@ def retryable_func_wrapper(
     for i in range(retries):
         try:
             return func(*args, **kwargs)
-        except tos.exceptions.TosServerError as e:
+        except TosServerError as e:
             err = e
             from tosfs.core import logger
 
