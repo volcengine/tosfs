@@ -394,6 +394,41 @@ class TosFileSystem(AbstractFileSystem):
         except Exception as e:
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
 
+    def rm(
+        self, path: str, recursive: bool = False, maxdepth: Optional[int] = None
+    ) -> None:
+        """Delete files.
+
+        Parameters
+        ----------
+        path: str or list of str
+            File(s) to delete.
+        recursive: bool
+            If file(s) are directories, recursively delete contents and then
+            also remove the directory
+        maxdepth: int or None
+            Depth to pass to walk for finding files to delete, if recursive.
+            If None, there will be no limit and infinite recursion may be
+            possible.
+
+        """
+        if not self.exists(path):
+            raise FileNotFoundError(path)
+
+        bucket, key, _ = self._split_path(path)
+        if not key:
+            raise TosfsError(f"Cannot remove a bucket {bucket} using rm api.")
+
+        if not recursive or maxdepth:
+            return super().rm(path, recursive=recursive, maxdepth=maxdepth)
+
+        try:
+            self._list_and_batch_delete_objects(bucket, key)
+        except (tos.exceptions.TosClientError, tos.exceptions.TosServerError) as e:
+            raise e
+        except Exception as e:
+            raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
+
     def mkdir(self, path: str, create_parents: bool = True, **kwargs: Any) -> None:
         """Create directory entry at path.
 
@@ -1063,6 +1098,40 @@ class TosFileSystem(AbstractFileSystem):
             out = {}
 
         return out if detail else list(out)
+
+    def _list_and_batch_delete_objects(self, bucket: str, key: str) -> None:
+        is_truncated = True
+        continuation_token = ""
+        all_results = []
+
+        class DeletingObject:
+            def __init__(self, key: str, version_id: Optional[str] = None):
+                self.key = key
+                self.version_id = version_id
+
+        while is_truncated:
+            resp = self.tos_client.list_objects_type2(
+                bucket,
+                prefix=key.rstrip("/") + "/",
+                delimiter="/",
+                max_keys=LS_OPERATION_DEFAULT_MAX_ITEMS,
+                continuation_token=continuation_token,
+            )
+            is_truncated = resp.is_truncated
+            continuation_token = resp.next_continuation_token
+            all_results.extend(resp.contents + resp.common_prefixes)
+
+        deleting_objects = [
+            DeletingObject(o.key if hasattr(o, "key") else o.prefix)
+            for o in all_results
+        ]
+
+        delete_resp = self.tos_client.delete_multi_objects(
+            bucket, deleting_objects, quiet=True
+        )
+        if delete_resp.error:
+            for d in delete_resp.error:
+                logger.warning("Deleted object: %s failed", d)
 
     def _copy_basic(self, path1: str, path2: str, **kwargs: Any) -> None:
         """Copy file between locations on tos.

@@ -628,6 +628,41 @@ def test_glob(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> No
     )
 
 
+def test_rm(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
+    file_name = random_str()
+    dir_name = random_str()
+    sub_dir_name = random_str()
+    sub_file_name = random_str()
+
+    # Test Non-Recursive Deletion
+    tosfs.touch(f"{bucket}/{temporary_workspace}/{file_name}")
+    assert tosfs.exists(f"{bucket}/{temporary_workspace}/{file_name}")
+    tosfs.rm(f"{bucket}/{temporary_workspace}/{file_name}")
+    assert not tosfs.exists(f"{bucket}/{temporary_workspace}/{file_name}")
+
+    # Test Recursive Deletion
+    tosfs.makedirs(f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}")
+    tosfs.touch(f"{bucket}/{temporary_workspace}/{dir_name}/{sub_file_name}")
+    tosfs.touch(
+        f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}/{sub_file_name}"
+    )
+    assert tosfs.exists(f"{bucket}/{temporary_workspace}/{dir_name}/{sub_file_name}")
+    assert tosfs.exists(
+        f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}/{sub_file_name}"
+    )
+    tosfs.rm(f"{bucket}/{temporary_workspace}/{dir_name}", recursive=True)
+    assert not tosfs.exists(f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}")
+    assert not tosfs.exists(f"{bucket}/{temporary_workspace}/{dir_name}")
+
+    # Test Deletion of Non-Existent Path
+    with pytest.raises(FileNotFoundError):
+        tosfs.rm(f"{bucket}/{temporary_workspace}/nonexistent")
+
+    # Test Deletion of Bucket
+    with pytest.raises(TosfsError):
+        tosfs.rm(bucket)
+
+
 ###########################################################
 #                File operation tests                     #
 ###########################################################
