@@ -25,6 +25,7 @@ import tos
 from fsspec import AbstractFileSystem
 from fsspec.spec import AbstractBufferedFile
 from fsspec.utils import setup_logging as setup_logger
+from tos.exceptions import TosClientError, TosServerError
 from tos.models import CommonPrefixInfo
 from tos.models2 import (
     CreateMultipartUploadOutput,
@@ -428,7 +429,7 @@ class TosFileSystem(AbstractFileSystem):
             else:
                 try:
                     self._list_and_batch_delete_objects(bucket, key)
-                except (tos.exceptions.TosClientError, tos.exceptions.TosServerError) as e:
+                except (TosClientError, TosServerError) as e:
                     raise e
                 except Exception as e:
                     raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
