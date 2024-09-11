@@ -14,18 +14,8 @@
 
 """The module contains constants for the tosfs package."""
 
-# Tos server response codes
-TOS_SERVER_RESPONSE_CODE_NOT_FOUND = 404
-
-TOS_SERVER_RETRYABLE_ERROR_CODE_SET = {
-    "IncompleteBody",
-    "ExceedAccountQPSLimit",
-    "ExceedAccountRateLimit",
-    "ExceedBucketQPSLimit",
-    "ExceedBucketRateLimit",
-    "InternalError",
-    "ServiceUnavailable",
-}
+# Tos server response status codes
+TOS_SERVER_STATUS_CODE_NOT_FOUND = 404
 
 MANAGED_COPY_MAX_THRESHOLD = 5 * 2**30
 MANAGED_COPY_MIN_THRESHOLD = 5 * 2**20
