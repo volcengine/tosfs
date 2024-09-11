@@ -388,9 +388,7 @@ class TosFileSystem(AbstractFileSystem):
 
         try:
             self.tos_client.delete_object(bucket, key.rstrip("/") + "/")
-        except tos.exceptions.TosClientError as e:
-            raise e
-        except tos.exceptions.TosServerError as e:
+        except (TosClientError, TosServerError) as e:
             raise e
         except Exception as e:
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
@@ -473,11 +471,7 @@ class TosFileSystem(AbstractFileSystem):
                     )
                 else:
                     self.tos_client.put_object(bucket, key.rstrip("/") + "/")
-        except tos.exceptions.TosClientError as e:
-            raise e
-        except tos.exceptions.TosServerError as e:
-            raise e
-        except FileNotFoundError as e:
+        except (TosClientError, TosServerError, FileNotFoundError) as e:
             raise e
         except Exception as e:
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
@@ -542,9 +536,7 @@ class TosFileSystem(AbstractFileSystem):
 
         try:
             self.tos_client.put_object(bucket, key)
-        except tos.exceptions.TosClientError as e:
-            raise e
-        except tos.exceptions.TosServerError as e:
+        except (TosClientError, TosServerError) as e:
             raise e
         except Exception as e:
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
@@ -587,9 +579,9 @@ class TosFileSystem(AbstractFileSystem):
         try:
             self.tos_client.head_object(bucket, key)
             return True
-        except tos.exceptions.TosClientError as e:
+        except TosClientError as e:
             raise e
-        except tos.exceptions.TosServerError as e:
+        except TosServerError as e:
             if e.status_code == TOS_SERVER_RESPONSE_CODE_NOT_FOUND:
                 return False
             else:
@@ -622,9 +614,9 @@ class TosFileSystem(AbstractFileSystem):
             # Attempt to get the object metadata
             self.tos_client.head_object(bucket, key)
             return True
-        except tos.exceptions.TosClientError as e:
+        except TosClientError as e:
             raise e
-        except tos.exceptions.TosServerError as e:
+        except TosServerError as e:
             if e.status_code == TOS_SERVER_RESPONSE_CODE_NOT_FOUND:
                 return False
             raise e
@@ -712,9 +704,7 @@ class TosFileSystem(AbstractFileSystem):
                     self.tos_client.complete_multipart_upload(
                         bucket, key, mpu.upload_id, complete_all=True
                     )
-        except tos.exceptions.TosClientError as e:
-            raise e
-        except tos.exceptions.TosServerError as e:
+        except (TosClientError, TosServerError) as e:
             raise e
         except Exception as e:
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
@@ -759,7 +749,7 @@ class TosFileSystem(AbstractFileSystem):
             while True:
                 try:
                     chunk = body.read(GET_OBJECT_OPERATION_DEFAULT_READ_CHUNK_SIZE)
-                except tos.exceptions.TosClientError as e:
+                except TosClientError as e:
                     failed_reads += 1
                     if failed_reads >= RETRY_NUM:
                         raise e
@@ -1159,9 +1149,7 @@ class TosFileSystem(AbstractFileSystem):
                 src_key=key1,
                 src_version_id=ver1,
             )
-        except tos.exceptions.TosClientError as e:
-            raise e
-        except tos.exceptions.TosServerError as e:
+        except (TosClientError, TosServerError) as e:
             raise e
         except Exception as e:
             raise TosfsError("Copy failed (%r -> %r): %s" % (path1, path2, e)) from e
@@ -1320,9 +1308,7 @@ class TosFileSystem(AbstractFileSystem):
                 **kwargs,
             )
             return resp.content, resp.content_length
-        except tos.exceptions.TosClientError as e:
-            raise e
-        except tos.exceptions.TosServerError as e:
+        except (TosClientError, TosServerError) as e:
             raise e
         except Exception as e:
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
@@ -1361,9 +1347,9 @@ class TosFileSystem(AbstractFileSystem):
         try:
             self.tos_client.head_bucket(bucket)
             return self._fill_bucket_info(bucket)
-        except tos.exceptions.TosClientError as e:
+        except TosClientError as e:
             raise e
-        except tos.exceptions.TosServerError as e:
+        except TosServerError as e:
             if e.status_code == TOS_SERVER_RESPONSE_CODE_NOT_FOUND:
                 raise FileNotFoundError(bucket) from e
             else:
@@ -1420,9 +1406,9 @@ class TosFileSystem(AbstractFileSystem):
                 "VersionId": out.version_id or "",
                 "ContentType": out.content_type or "",
             }
-        except tos.exceptions.TosClientError as e:
+        except TosClientError as e:
             raise e
-        except tos.exceptions.TosServerError as e:
+        except TosServerError as e:
             if e.status_code == TOS_SERVER_RESPONSE_CODE_NOT_FOUND:
                 pass
             else:
@@ -1452,11 +1438,7 @@ class TosFileSystem(AbstractFileSystem):
                 }
 
             raise FileNotFoundError(path)
-        except tos.exceptions.TosClientError as e:
-            raise e
-        except tos.exceptions.TosServerError as e:
-            raise e
-        except FileNotFoundError as e:
+        except (TosClientError, TosServerError, FileNotFoundError) as e:
             raise e
         except Exception as e:
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
@@ -1542,9 +1524,9 @@ class TosFileSystem(AbstractFileSystem):
         try:
             self.tos_client.head_bucket(bucket)
             return True
-        except tos.exceptions.TosClientError as e:
+        except TosClientError as e:
             raise e
-        except tos.exceptions.TosServerError as e:
+        except TosServerError as e:
             if e.status_code == TOS_SERVER_RESPONSE_CODE_NOT_FOUND:
                 return False
             else:
@@ -1594,9 +1576,9 @@ class TosFileSystem(AbstractFileSystem):
         try:
             self.tos_client.head_object(bucket, key)
             return True
-        except tos.exceptions.TosClientError as e:
+        except TosClientError as e:
             raise e
-        except tos.exceptions.TosServerError as e:
+        except TosServerError as e:
             if e.status_code == TOS_SERVER_RESPONSE_CODE_NOT_FOUND:
                 return False
             else:
@@ -1631,9 +1613,7 @@ class TosFileSystem(AbstractFileSystem):
         """
         try:
             resp = self.tos_client.list_buckets()
-        except tos.exceptions.TosClientError as e:
-            raise e
-        except tos.exceptions.TosServerError as e:
+        except (TosClientError, TosServerError) as e:
             raise e
         except Exception as e:
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
@@ -1801,9 +1781,7 @@ class TosFileSystem(AbstractFileSystem):
                     all_results.extend(resp.contents + resp.common_prefixes)
 
             return all_results
-        except tos.exceptions.TosClientError as e:
-            raise e
-        except tos.exceptions.TosServerError as e:
+        except (TosClientError, TosServerError) as e:
             raise e
         except Exception as e:
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
@@ -1817,9 +1795,7 @@ class TosFileSystem(AbstractFileSystem):
 
         try:
             self.tos_client.delete_object(bucket, key)
-        except tos.exceptions.TosClientError as e:
-            raise e
-        except tos.exceptions.TosServerError as e:
+        except (TosClientError, TosServerError) as e:
             raise e
         except Exception as e:
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
