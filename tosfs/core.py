@@ -412,22 +412,29 @@ class TosFileSystem(AbstractFileSystem):
             possible.
 
         """
-        if not self.exists(path):
-            raise FileNotFoundError(path)
+        if isinstance(path, str):
+            if not self.exists(path):
+                raise FileNotFoundError(path)
 
-        bucket, key, _ = self._split_path(path)
-        if not key:
-            raise TosfsError(f"Cannot remove a bucket {bucket} using rm api.")
+            bucket, key, _ = self._split_path(path)
+            if not key:
+                raise TosfsError(f"Cannot remove a bucket {bucket} using rm api.")
 
-        if not recursive or maxdepth:
-            return super().rm(path, recursive=recursive, maxdepth=maxdepth)
+            if not recursive or maxdepth:
+                return super().rm(path, recursive=recursive, maxdepth=maxdepth)
 
-        try:
-            self._list_and_batch_delete_objects(bucket, key)
-        except (tos.exceptions.TosClientError, tos.exceptions.TosServerError) as e:
-            raise e
-        except Exception as e:
-            raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
+            if self.isfile(path):
+                self.rm_file(path)
+            else:
+                try:
+                    self._list_and_batch_delete_objects(bucket, key)
+                except (tos.exceptions.TosClientError, tos.exceptions.TosServerError) as e:
+                    raise e
+                except Exception as e:
+                    raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
+        else:
+            for single_path in path:
+                self.rm(single_path, recursive=recursive, maxdepth=maxdepth)
 
     def mkdir(self, path: str, create_parents: bool = True, **kwargs: Any) -> None:
         """Create directory entry at path.
@@ -1126,12 +1133,13 @@ class TosFileSystem(AbstractFileSystem):
             for o in all_results
         ]
 
-        delete_resp = self.tos_client.delete_multi_objects(
-            bucket, deleting_objects, quiet=True
-        )
-        if delete_resp.error:
-            for d in delete_resp.error:
-                logger.warning("Deleted object: %s failed", d)
+        if deleting_objects:
+            delete_resp = self.tos_client.delete_multi_objects(
+                bucket, deleting_objects, quiet=True
+            )
+            if delete_resp.error:
+                for d in delete_resp.error:
+                    logger.warning("Deleted object: %s failed", d)
 
     def _copy_basic(self, path1: str, path2: str, **kwargs: Any) -> None:
         """Copy file between locations on tos.
