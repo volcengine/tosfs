@@ -31,7 +31,10 @@ from tos.models2 import (
     CreateMultipartUploadOutput,
     ListedObject,
     ListedObjectVersion,
+    ListObjectType2Output,
+    ListObjectVersionsOutput,
     PartInfo,
+    UploadPartCopyOutput,
     UploadPartOutput,
 )
 
@@ -46,12 +49,13 @@ from tosfs.consts import (
     PART_MAX_SIZE,
     PUT_OBJECT_OPERATION_SMALL_FILE_THRESHOLD,
     RETRY_NUM,
-    TOS_SERVER_RESPONSE_CODE_NOT_FOUND,
+    TOS_SERVER_STATUS_CODE_NOT_FOUND,
     TOSFS_LOG_FORMAT,
 )
 from tosfs.exceptions import TosfsError
 from tosfs.fsspec_utils import glob_translate
-from tosfs.utils import find_bucket_key, get_brange, retryable_func_wrapper
+from tosfs.stability import retryable_func_executor
+from tosfs.utils import find_bucket_key, get_brange
 
 logger = logging.getLogger("tosfs")
 
@@ -98,7 +102,7 @@ class TosFileSystem(AbstractFileSystem):
         key: str = "",
         secret: str = "",
         region: Optional[str] = None,
-        max_retry_count: int = 20,
+        max_retry_num: int = 20,
         max_connections: int = 1024,
         connection_time: int = 10,
         socket_timeout: int = 30,
@@ -122,7 +126,7 @@ class TosFileSystem(AbstractFileSystem):
             The secret access key(sk) to access the TOS service.
         region : str, optional
             The region of the TOS service.
-        max_retry_count : int, optional
+        max_retry_num : int, optional
             The maximum number of retries for a failed request (default is 20).
         max_connections : int, optional
             The maximum number of HTTP connections that can be opened in the
@@ -161,7 +165,7 @@ class TosFileSystem(AbstractFileSystem):
             secret,
             endpoint_url,
             region,
-            max_retry_count=max_retry_count,
+            max_retry_count=0,
             max_connections=max_connections,
             connection_time=connection_time,
             socket_timeout=socket_timeout,
@@ -174,6 +178,7 @@ class TosFileSystem(AbstractFileSystem):
         )
         self.default_fill_cache = default_fill_cache
         self.default_cache_type = default_cache_type
+        self.max_retry_num = max_retry_num
 
         super().__init__(**kwargs)
 
@@ -386,12 +391,10 @@ class TosFileSystem(AbstractFileSystem):
         if len(self._listdir(bucket, max_items=1, prefix=key.rstrip("/") + "/")) > 0:
             raise TosfsError(f"Directory {path} is not empty.")
 
-        try:
-            self.tos_client.delete_object(bucket, key.rstrip("/") + "/")
-        except (TosClientError, TosServerError) as e:
-            raise e
-        except Exception as e:
-            raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
+        retryable_func_executor(
+            lambda: self.tos_client.delete_object(bucket, key.rstrip("/") + "/"),
+            max_retry_num=self.max_retry_num,
+        )
 
     def rm(
         self, path: str, recursive: bool = False, maxdepth: Optional[int] = None
@@ -456,25 +459,25 @@ class TosFileSystem(AbstractFileSystem):
         if not key:
             raise TosfsError(f"Cannot create a bucket {bucket} using mkdir api.")
 
-        try:
-            if create_parents:
-                parent = self._parent(f"{bucket}/{key}".rstrip("/") + "/")
-                if not self.exists(parent):
-                    # here we need to create the parent directory recursively
-                    self.mkdir(parent, create_parents=True)
-                self.tos_client.put_object(bucket, key.rstrip("/") + "/")
+        if create_parents:
+            parent = self._parent(f"{bucket}/{key}".rstrip("/") + "/")
+            if not self.exists(parent):
+                # here we need to create the parent directory recursively
+                self.mkdir(parent, create_parents=True)
+
+            retryable_func_executor(
+                lambda: self.tos_client.put_object(bucket, key.rstrip("/") + "/"),
+                max_retry_num=self.max_retry_num,
+            )
+        else:
+            parent = self._parent(path)
+            if not self.exists(parent):
+                raise FileNotFoundError(f"Parent directory {parent} does not exist.")
             else:
-                parent = self._parent(path)
-                if not self.exists(parent):
-                    raise FileNotFoundError(
-                        f"Parent directory {parent} does not exist."
-                    )
-                else:
-                    self.tos_client.put_object(bucket, key.rstrip("/") + "/")
-        except (TosClientError, TosServerError, FileNotFoundError) as e:
-            raise e
-        except Exception as e:
-            raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
+                retryable_func_executor(
+                    lambda: self.tos_client.put_object(bucket, key.rstrip("/") + "/"),
+                    max_retry_num=self.max_retry_num,
+                )
 
     def makedirs(self, path: str, exist_ok: bool = False) -> None:
         """Recursively make directories.
@@ -534,12 +537,10 @@ class TosFileSystem(AbstractFileSystem):
         if not truncate and self.exists(path):
             raise FileExistsError(f"File {path} already exists.")
 
-        try:
-            self.tos_client.put_object(bucket, key)
-        except (TosClientError, TosServerError) as e:
-            raise e
-        except Exception as e:
-            raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
+        retryable_func_executor(
+            lambda: self.tos_client.put_object(bucket, key),
+            max_retry_num=self.max_retry_num,
+        )
 
     def isdir(self, path: str) -> bool:
         """Check if the path is a directory.
@@ -577,12 +578,14 @@ class TosFileSystem(AbstractFileSystem):
         key = key.rstrip("/") + "/"
 
         try:
-            self.tos_client.head_object(bucket, key)
-            return True
+            return retryable_func_executor(
+                lambda: self.tos_client.head_object(bucket, key) or True,
+                max_retry_num=self.max_retry_num,
+            )
         except TosClientError as e:
             raise e
         except TosServerError as e:
-            if e.status_code == TOS_SERVER_RESPONSE_CODE_NOT_FOUND:
+            if e.status_code == TOS_SERVER_STATUS_CODE_NOT_FOUND:
                 return False
             else:
                 raise e
@@ -611,13 +614,14 @@ class TosFileSystem(AbstractFileSystem):
             return False
 
         try:
-            # Attempt to get the object metadata
-            self.tos_client.head_object(bucket, key)
-            return True
+            return retryable_func_executor(
+                lambda: self.tos_client.head_object(bucket, key) or True,
+                max_retry_num=self.max_retry_num,
+            )
         except TosClientError as e:
             raise e
         except TosServerError as e:
-            if e.status_code == TOS_SERVER_RESPONSE_CODE_NOT_FOUND:
+            if e.status_code == TOS_SERVER_STATUS_CODE_NOT_FOUND:
                 return False
             raise e
         except Exception as e:
@@ -674,40 +678,45 @@ class TosFileSystem(AbstractFileSystem):
         if "ContentType" not in kwargs:
             content_type, _ = mimetypes.guess_type(lpath)
 
+        if self.isfile(rpath):
+            self.makedirs(self._parent(rpath), exist_ok=True)
+
+        if self.isdir(rpath):
+            rpath = os.path.join(rpath, os.path.basename(lpath))
+
         bucket, key, _ = self._split_path(rpath)
 
-        try:
-            if self.isfile(rpath):
-                self.makedirs(self._parent(rpath), exist_ok=True)
-
-            if self.isdir(rpath):
-                rpath = os.path.join(rpath, os.path.basename(lpath))
-
-            bucket, key, _ = self._split_path(rpath)
-
-            with open(lpath, "rb") as f:
-                if size < min(PUT_OBJECT_OPERATION_SMALL_FILE_THRESHOLD, 2 * chunksize):
-                    chunk = f.read()
-                    self.tos_client.put_object(
+        with open(lpath, "rb") as f:
+            if size < min(PUT_OBJECT_OPERATION_SMALL_FILE_THRESHOLD, 2 * chunksize):
+                chunk = f.read()
+                retryable_func_executor(
+                    lambda: self.tos_client.put_object(
                         bucket,
                         key,
                         content=chunk,
                         content_type=content_type,
-                    )
-                else:
-                    mpu = self.tos_client.create_multipart_upload(
+                    ),
+                    max_retry_num=self.max_retry_num,
+                )
+            else:
+                mpu = retryable_func_executor(
+                    lambda: self.tos_client.create_multipart_upload(
                         bucket, key, content_type=content_type
-                    )
-                    self.tos_client.upload_part_from_file(
+                    ),
+                    max_retry_num=self.max_retry_num,
+                )
+                retryable_func_executor(
+                    lambda: self.tos_client.upload_part_from_file(
                         bucket, key, mpu.upload_id, file_path=lpath, part_number=1
-                    )
-                    self.tos_client.complete_multipart_upload(
+                    ),
+                    max_retry_num=self.max_retry_num,
+                )
+                retryable_func_executor(
+                    lambda: self.tos_client.complete_multipart_upload(
                         bucket, key, mpu.upload_id, complete_all=True
-                    )
-        except (TosClientError, TosServerError) as e:
-            raise e
-        except Exception as e:
-            raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
+                    ),
+                    max_retry_num=self.max_retry_num,
+                )
 
     def get_file(self, rpath: str, lpath: str, **kwargs: Any) -> None:
         """Get a file from the TOS filesystem and write to a local path.
@@ -1108,12 +1117,22 @@ class TosFileSystem(AbstractFileSystem):
                 self.version_id = version_id
 
         while is_truncated:
-            resp = self.tos_client.list_objects_type2(
-                bucket,
-                prefix=key.rstrip("/") + "/",
-                delimiter="/",
-                max_keys=LS_OPERATION_DEFAULT_MAX_ITEMS,
-                continuation_token=continuation_token,
+
+            def _call_list_objects_type2(
+                continuation_token: str = continuation_token,
+            ) -> ListObjectType2Output:
+                return self.tos_client.list_objects_type2(
+                    bucket,
+                    prefix=key.rstrip("/") + "/",
+                    delimiter="/",
+                    max_keys=LS_OPERATION_DEFAULT_MAX_ITEMS,
+                    continuation_token=continuation_token,
+                )
+
+            resp = retryable_func_executor(
+                _call_list_objects_type2,
+                args=(continuation_token,),
+                max_retry_num=self.max_retry_num,
             )
             is_truncated = resp.is_truncated
             continuation_token = resp.next_continuation_token
@@ -1125,8 +1144,11 @@ class TosFileSystem(AbstractFileSystem):
         ]
 
         if deleting_objects:
-            delete_resp = self.tos_client.delete_multi_objects(
-                bucket, deleting_objects, quiet=True
+            delete_resp = retryable_func_executor(
+                lambda: self.tos_client.delete_multi_objects(
+                    bucket, deleting_objects, quiet=True
+                ),
+                max_retry_num=self.max_retry_num,
             )
             if delete_resp.error:
                 for d in delete_resp.error:
@@ -1141,18 +1163,17 @@ class TosFileSystem(AbstractFileSystem):
         buc2, key2, ver2 = self._split_path(path2)
         if ver2:
             raise ValueError("Cannot copy to a versioned file!")
-        try:
-            self.tos_client.copy_object(
+
+        retryable_func_executor(
+            lambda: self.tos_client.copy_object(
                 bucket=buc2,
                 key=key2,
                 src_bucket=buc1,
                 src_key=key1,
                 src_version_id=ver1,
-            )
-        except (TosClientError, TosServerError) as e:
-            raise e
-        except Exception as e:
-            raise TosfsError("Copy failed (%r -> %r): %s" % (path1, path2, e)) from e
+            ),
+            max_retry_num=self.max_retry_num,
+        )
 
     def _copy_etag_preserved(
         self, path1: str, path2: str, size: int, total_parts: int, **kwargs: Any
@@ -1164,7 +1185,10 @@ class TosFileSystem(AbstractFileSystem):
         upload_id = None
 
         try:
-            mpu = self.tos_client.create_multipart_upload(bucket2, key2)
+            mpu = retryable_func_executor(
+                lambda: self.tos_client.create_multipart_upload(bucket2, key2),
+                max_retry_num=self.max_retry_num,
+            )
             upload_id = mpu.upload_id
 
             parts = []
@@ -1176,15 +1200,26 @@ class TosFileSystem(AbstractFileSystem):
                 if brange_last > size:
                     brange_last = size - 1
 
-                part = self.tos_client.upload_part_copy(
-                    bucket=bucket2,
-                    key=key2,
-                    part_number=i,
-                    upload_id=upload_id,
-                    src_bucket=bucket1,
-                    src_key=key1,
-                    copy_source_range_start=brange_first,
-                    copy_source_range_end=brange_last,
+                def _call_upload_part_copy(
+                    i: int = i,
+                    brange_first: int = brange_first,
+                    brange_last: int = brange_last,
+                ) -> UploadPartCopyOutput:
+                    return self.tos_client.upload_part_copy(
+                        bucket=bucket2,
+                        key=key2,
+                        part_number=i,
+                        upload_id=upload_id,
+                        src_bucket=bucket1,
+                        src_key=key1,
+                        copy_source_range_start=brange_first,
+                        copy_source_range_end=brange_last,
+                    )
+
+                part = retryable_func_executor(
+                    _call_upload_part_copy,
+                    args=(i, brange_first, brange_last),
+                    max_retry_num=self.max_retry_num,
                 )
                 parts.append(
                     PartInfo(
@@ -1198,9 +1233,19 @@ class TosFileSystem(AbstractFileSystem):
                 )
                 brange_first += part_size
 
-            self.tos_client.complete_multipart_upload(bucket2, key2, upload_id, parts)
+            retryable_func_executor(
+                lambda: self.tos_client.complete_multipart_upload(
+                    bucket2, key2, upload_id, parts
+                ),
+                max_retry_num=self.max_retry_num,
+            )
         except Exception as e:
-            self.tos_client.abort_multipart_upload(bucket2, key2, upload_id)
+            retryable_func_executor(
+                lambda: self.tos_client.abort_multipart_upload(
+                    bucket2, key2, upload_id
+                ),
+                max_retry_num=self.max_retry_num,
+            )
             raise TosfsError(f"Copy failed ({path1} -> {path2}): {e}") from e
 
     def _copy_managed(
@@ -1227,10 +1272,16 @@ class TosFileSystem(AbstractFileSystem):
         upload_id = None
 
         try:
-            mpu = self.tos_client.create_multipart_upload(bucket2, key2)
+            mpu = retryable_func_executor(
+                lambda: self.tos_client.create_multipart_upload(bucket2, key2),
+                max_retry_num=self.max_retry_num,
+            )
             upload_id = mpu.upload_id
-            out = [
-                self.tos_client.upload_part_copy(
+
+            def _call_upload_part_copy(
+                i: int, brange_first: int, brange_last: int
+            ) -> UploadPartCopyOutput:
+                return self.tos_client.upload_part_copy(
                     bucket=bucket2,
                     key=key2,
                     part_number=i + 1,
@@ -1239,6 +1290,13 @@ class TosFileSystem(AbstractFileSystem):
                     src_key=key1,
                     copy_source_range_start=brange_first,
                     copy_source_range_end=brange_last,
+                )
+
+            out = [
+                retryable_func_executor(
+                    _call_upload_part_copy,
+                    args=(i, brange_first, brange_last),
+                    max_retry_num=self.max_retry_num,
                 )
                 for i, (brange_first, brange_last) in enumerate(get_brange(size, block))
             ]
@@ -1255,9 +1313,19 @@ class TosFileSystem(AbstractFileSystem):
                 for i, o in enumerate(out)
             ]
 
-            self.tos_client.complete_multipart_upload(bucket2, key2, upload_id, parts)
+            retryable_func_executor(
+                lambda: self.tos_client.complete_multipart_upload(
+                    bucket2, key2, upload_id, parts
+                ),
+                max_retry_num=self.max_retry_num,
+            )
         except Exception as e:
-            self.tos_client.abort_multipart_upload(bucket2, key2, upload_id)
+            retryable_func_executor(
+                lambda: self.tos_client.abort_multipart_upload(
+                    bucket2, key2, upload_id
+                ),
+                max_retry_num=self.max_retry_num,
+            )
             raise TosfsError(f"Copy failed ({path1} -> {path2}): {e}") from e
 
     def _find_file_dir(
@@ -1299,19 +1367,17 @@ class TosFileSystem(AbstractFileSystem):
         range_start: int,
         **kwargs: Any,
     ) -> Tuple[BinaryIO, int]:
-        try:
-            resp = self.tos_client.get_object(
+        resp = retryable_func_executor(
+            lambda: self.tos_client.get_object(
                 bucket,
                 key,
                 version_id=version_id,
                 range_start=range_start,
                 **kwargs,
-            )
-            return resp.content, resp.content_length
-        except (TosClientError, TosServerError) as e:
-            raise e
-        except Exception as e:
-            raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
+            ),
+            max_retry_num=self.max_retry_num,
+        )
+        return resp.content, resp.content_length
 
     def _bucket_info(self, bucket: str) -> dict:
         """Get the information of a bucket.
@@ -1345,12 +1411,15 @@ class TosFileSystem(AbstractFileSystem):
 
         """
         try:
-            self.tos_client.head_bucket(bucket)
+            retryable_func_executor(
+                lambda: self.tos_client.head_bucket(bucket),
+                max_retry_num=self.max_retry_num,
+            )
             return self._fill_bucket_info(bucket)
         except TosClientError as e:
             raise e
         except TosServerError as e:
-            if e.status_code == TOS_SERVER_RESPONSE_CODE_NOT_FOUND:
+            if e.status_code == TOS_SERVER_STATUS_CODE_NOT_FOUND:
                 raise FileNotFoundError(bucket) from e
             else:
                 raise e
@@ -1395,7 +1464,10 @@ class TosFileSystem(AbstractFileSystem):
 
         """
         try:
-            out = self.tos_client.head_object(bucket, key, version_id=version_id)
+            out = retryable_func_executor(
+                lambda: self.tos_client.head_object(bucket, key, version_id=version_id),
+                max_retry_num=self.max_retry_num,
+            )
             return {
                 "ETag": out.etag or "",
                 "LastModified": out.last_modified or "",
@@ -1409,7 +1481,7 @@ class TosFileSystem(AbstractFileSystem):
         except TosClientError as e:
             raise e
         except TosServerError as e:
-            if e.status_code == TOS_SERVER_RESPONSE_CODE_NOT_FOUND:
+            if e.status_code == TOS_SERVER_STATUS_CODE_NOT_FOUND:
                 pass
             else:
                 raise e
@@ -1422,11 +1494,14 @@ class TosFileSystem(AbstractFileSystem):
         try:
             # We check to see if the path is a directory by attempting to list its
             # contexts. If anything is found, it is indeed a directory
-            out = self.tos_client.list_objects_type2(
-                bucket,
-                prefix=key.rstrip("/") + "/" if key else "",
-                delimiter="/",
-                max_keys=1,
+            out = retryable_func_executor(
+                lambda: self.tos_client.list_objects_type2(
+                    bucket,
+                    prefix=key.rstrip("/") + "/" if key else "",
+                    delimiter="/",
+                    max_keys=1,
+                ),
+                max_retry_num=self.max_retry_num,
             )
 
             if out.key_count > 0 or out.contents or out.common_prefixes:
@@ -1522,12 +1597,15 @@ class TosFileSystem(AbstractFileSystem):
 
         """
         try:
-            self.tos_client.head_bucket(bucket)
+            retryable_func_executor(
+                lambda: self.tos_client.head_bucket(bucket),
+                max_retry_num=self.max_retry_num,
+            )
             return True
         except TosClientError as e:
             raise e
         except TosServerError as e:
-            if e.status_code == TOS_SERVER_RESPONSE_CODE_NOT_FOUND:
+            if e.status_code == TOS_SERVER_STATUS_CODE_NOT_FOUND:
                 return False
             else:
                 raise e
@@ -1574,12 +1652,14 @@ class TosFileSystem(AbstractFileSystem):
 
         """
         try:
-            self.tos_client.head_object(bucket, key)
-            return True
+            return retryable_func_executor(
+                lambda: self.tos_client.head_object(bucket, key) or True,
+                max_retry_num=self.max_retry_num,
+            )
         except TosClientError as e:
             raise e
         except TosServerError as e:
-            if e.status_code == TOS_SERVER_RESPONSE_CODE_NOT_FOUND:
+            if e.status_code == TOS_SERVER_STATUS_CODE_NOT_FOUND:
                 return False
             else:
                 raise e
@@ -1612,7 +1692,9 @@ class TosFileSystem(AbstractFileSystem):
 
         """
         try:
-            resp = self.tos_client.list_buckets()
+            resp = retryable_func_executor(
+                lambda: self.tos_client.list_buckets(), max_retry_num=self.max_retry_num
+            )
         except (TosClientError, TosServerError) as e:
             raise e
         except Exception as e:
@@ -1744,11 +1826,15 @@ class TosFileSystem(AbstractFileSystem):
         all_results = []
         is_truncated = True
 
-        try:
-            if self.version_aware:
-                key_marker, version_id_marker = None, None
-                while is_truncated:
-                    resp = self.tos_client.list_object_versions(
+        if self.version_aware:
+            key_marker, version_id_marker = None, None
+            while is_truncated:
+
+                def _call_list_object_versions(
+                    key_marker: Optional[Any] = key_marker,
+                    version_id_marker: Optional[Any] = version_id_marker,
+                ) -> ListObjectVersionsOutput:
+                    return self.tos_client.list_object_versions(
                         bucket,
                         prefix,
                         delimiter=delimiter,
@@ -1756,18 +1842,28 @@ class TosFileSystem(AbstractFileSystem):
                         key_marker=key_marker,
                         version_id_marker=version_id_marker,
                     )
-                    is_truncated = resp.is_truncated
-                    all_results.extend(
-                        resp.versions + resp.common_prefixes + resp.delete_markers
-                    )
-                    key_marker, version_id_marker = (
-                        resp.next_key_marker,
-                        resp.next_version_id_marker,
-                    )
-            else:
-                continuation_token = ""
-                while is_truncated:
-                    resp = self.tos_client.list_objects_type2(
+
+                resp = retryable_func_executor(
+                    _call_list_object_versions,
+                    args=(key_marker, version_id_marker),
+                    max_retry_num=self.max_retry_num,
+                )
+                is_truncated = resp.is_truncated
+                all_results.extend(
+                    resp.versions + resp.common_prefixes + resp.delete_markers
+                )
+                key_marker, version_id_marker = (
+                    resp.next_key_marker,
+                    resp.next_version_id_marker,
+                )
+        else:
+            continuation_token = ""
+            while is_truncated:
+
+                def _call_list_objects_type2(
+                    continuation_token: str = continuation_token,
+                ) -> ListObjectType2Output:
+                    return self.tos_client.list_objects_type2(
                         bucket,
                         prefix,
                         start_after=prefix if not include_self else None,
@@ -1775,16 +1871,18 @@ class TosFileSystem(AbstractFileSystem):
                         max_keys=max_items,
                         continuation_token=continuation_token,
                     )
-                    is_truncated = resp.is_truncated
-                    continuation_token = resp.next_continuation_token
 
-                    all_results.extend(resp.contents + resp.common_prefixes)
+                resp = retryable_func_executor(
+                    _call_list_objects_type2,
+                    args=(continuation_token,),
+                    max_retry_num=self.max_retry_num,
+                )
+                is_truncated = resp.is_truncated
+                continuation_token = resp.next_continuation_token
 
-            return all_results
-        except (TosClientError, TosServerError) as e:
-            raise e
-        except Exception as e:
-            raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
+                all_results.extend(resp.contents + resp.common_prefixes)
+
+        return all_results
 
     def _rm(self, path: str) -> None:
         logger.info("Removing path: %s", path)
@@ -1794,7 +1892,10 @@ class TosFileSystem(AbstractFileSystem):
             key = key.rstrip("/") + "/"
 
         try:
-            self.tos_client.delete_object(bucket, key)
+            retryable_func_executor(
+                lambda: self.tos_client.delete_object(bucket, key),
+                max_retry_num=self.max_retry_num,
+            )
         except (TosClientError, TosServerError) as e:
             raise e
         except Exception as e:
@@ -2063,7 +2164,7 @@ class TosFile(AbstractBufferedFile):
                 bucket, key, version_id, range_start=start, range_end=end
             ).read()
 
-        return retryable_func_wrapper(fetch, retries=RETRY_NUM)
+        return retryable_func_executor(fetch, max_retry_num=self.fs.max_retry_num)
 
     def commit(self) -> None:
         """Complete multipart upload or PUT."""
