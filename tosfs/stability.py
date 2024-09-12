@@ -68,7 +68,7 @@ TOS_CLIENT_RETRYABLE_EXCEPTIONS = {
 MAX_RETRY_NUM = 20
 
 
-def retryable_func(
+def retryable_func_executor(
     func: Any,
     *,
     args: Tuple[Any, ...] = (),
