@@ -495,9 +495,10 @@ class TosFileSystem(AbstractFileSystem):
 
         """
         path = self._strip_protocol(path).rstrip("/") + "/"
-        if exist_ok and self.exists(path):
+        path_exist = self.exists(path)
+        if exist_ok and path_exist:
             return
-        if not exist_ok and self.exists(path):
+        if not exist_ok and path_exist:
             raise FileExistsError(path)
 
         self.mkdir(path, create_parents=True)
