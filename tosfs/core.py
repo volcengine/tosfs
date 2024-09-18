@@ -46,6 +46,7 @@ from tosfs.consts import (
     LS_OPERATION_DEFAULT_MAX_ITEMS,
     MANAGED_COPY_MAX_THRESHOLD,
     MANAGED_COPY_MIN_THRESHOLD,
+    MPU_PART_SIZE_THRESHOLD,
     PART_MAX_SIZE,
     PUT_OBJECT_OPERATION_SMALL_FILE_THRESHOLD,
     RETRY_NUM,
@@ -1991,6 +1992,12 @@ class TosFile(AbstractBufferedFile):
         bucket, key, path_version_id = fs._split_path(path)
         if not key:
             raise ValueError("Attempt to open non key-like path: %s" % path)
+
+        if "r" not in mode and int(block_size) < MPU_PART_SIZE_THRESHOLD:
+            raise ValueError(
+                f"Block size must be >= {MPU_PART_SIZE_THRESHOLD // (2**20)}MB."
+            )
+
         super().__init__(
             fs,
             path,

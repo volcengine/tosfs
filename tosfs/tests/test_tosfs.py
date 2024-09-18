@@ -747,6 +747,18 @@ def test_file_write_mpu(
     )
 
 
+def test_file_write_mpu_threshold_check(
+    tosfs: TosFileSystem, bucket: str, temporary_workspace: str
+):
+    file_name = random_str()
+    content = "a" * 1 * 1024
+    block_size = 4 * 1024
+    with pytest.raises(ValueError, match="Block size must be >= 4MB."), tosfs.open(
+        f"{bucket}/{temporary_workspace}/{file_name}", "w", block_size=block_size
+    ) as f:
+        f.write(content)
+
+
 def test_file_write_append(
     tosfs: TosFileSystem, bucket: str, temporary_workspace: str
 ) -> None:
