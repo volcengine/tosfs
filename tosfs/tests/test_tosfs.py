@@ -55,6 +55,48 @@ def test_ls_dir(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> 
     assert tosfs.ls(f"{bucket}/{temporary_workspace}/nonexistent", detail=False) == []
 
 
+def test_ls_iterate(
+    tosfs: TosFileSystem, bucket: str, temporary_workspace: str
+) -> None:
+    dir_name = random_str()
+    another_dir_name = random_str()
+    sub_dir_name = random_str()
+    file_name = random_str()
+    sub_file_name = random_str()
+
+    tosfs.makedirs(f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}")
+    tosfs.makedirs(f"{bucket}/{temporary_workspace}/{another_dir_name}")
+    tosfs.touch(f"{bucket}/{temporary_workspace}/{dir_name}/{file_name}")
+    tosfs.touch(
+        f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}/{sub_file_name}"
+    )
+
+    # Test listing without detail
+    result = list(tosfs.ls_iterate(f"{bucket}/{temporary_workspace}"))
+    assert f"{bucket}/{temporary_workspace}/{dir_name}" in result
+
+    # Test listing with detail
+    result = list(tosfs.ls_iterate(f"{bucket}/{temporary_workspace}", detail=True))
+    assert any(
+        item["name"] == f"{bucket}/{temporary_workspace}/{dir_name}" for item in result
+    )
+
+    # Test list with iterate
+    for item in tosfs.ls_iterate(f"{bucket}/{temporary_workspace}", detail=True):
+        assert item["name"] in sorted(
+            [
+                f"{bucket}/{temporary_workspace}/{dir_name}",
+                f"{bucket}/{temporary_workspace}/{another_dir_name}",
+            ]
+        )
+
+    # Test listing with batch size and while loop more than one time
+    result = []
+    for batch in tosfs.ls_iterate(f"{bucket}/{temporary_workspace}", batch_size=1):
+        result.append(batch)
+    assert len(result) == len([dir_name, another_dir_name])
+
+
 def test_inner_rm(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
     file_name = random_str()
     tosfs.tos_client.put_object(bucket=bucket, key=f"{temporary_workspace}/{file_name}")
