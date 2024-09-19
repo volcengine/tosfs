@@ -685,7 +685,7 @@ def test_file_write_encdec(
     with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "wb") as f:
         f.write(content.encode("gbk"))
     with tosfs.open(
-        f"{bucket}/{temporary_workspace}/{file_name}", "rb", encoding="gbk"
+        f"{bucket}/{temporary_workspace}/{file_name}", "r", encoding="gbk"
     ) as f:
         assert f.read() == content
 
@@ -695,7 +695,7 @@ def test_file_write_encdec(
     with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "wb") as f:
         f.write(content.encode("utf-16-le"))
     with tosfs.open(
-        f"{bucket}/{temporary_workspace}/{file_name}", "rb", encoding="utf-16-le"
+        f"{bucket}/{temporary_workspace}/{file_name}", "r", encoding="utf-16-le"
     ) as f:
         assert f.read() == content
 
