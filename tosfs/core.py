@@ -312,6 +312,85 @@ class TosFileSystem(AbstractFileSystem):
 
         return files if detail else sorted([o["name"] for o in files])
 
+    def ls_iterate(
+        self,
+        path: str,
+        detail: bool = False,
+        versions: bool = False,
+        batch_size: int = LS_OPERATION_DEFAULT_MAX_ITEMS,
+        **kwargs: Union[str, bool, float, None],
+    ) -> Generator[Union[dict, str], None, None]:
+        """List objects under the given path in batches then returns an iterator.
+
+        Parameters
+        ----------
+        path : str
+            The path to list.
+        detail : bool, optional
+            Whether to return detailed information (default is False).
+        versions : bool, optional
+            Whether to list object versions (default is False).
+        batch_size : int, optional
+            The number of items to fetch in each batch (default is 1000).
+        **kwargs : dict, optional
+            Additional arguments.
+
+        Returns
+        -------
+        Generator[Union[dict, str], None, None]
+            An iterator that yields objects under the given path.
+
+        Raises
+        ------
+        ValueError
+            If versions is specified but the filesystem is not version aware.
+
+        """
+        if versions and not self.version_aware:
+            raise ValueError(
+                "versions cannot be specified if the filesystem "
+                "is not version aware."
+            )
+
+        path = self._strip_protocol(path).rstrip("/")
+        bucket, key, _ = self._split_path(path)
+        prefix = key.lstrip("/") + "/" if key else ""
+        continuation_token = ""
+        is_truncated = True
+
+        while is_truncated:
+
+            def _call_list_objects_type2(
+                continuation_token: str = continuation_token,
+            ) -> ListObjectType2Output:
+                return self.tos_client.list_objects_type2(
+                    bucket,
+                    prefix,
+                    start_after=prefix,
+                    delimiter="/",
+                    max_keys=batch_size,
+                    continuation_token=continuation_token,
+                )
+
+            resp = retryable_func_executor(
+                _call_list_objects_type2,
+                args=(continuation_token,),
+                max_retry_num=self.max_retry_num,
+            )
+            is_truncated = resp.is_truncated
+            continuation_token = resp.next_continuation_token
+            results = resp.contents + resp.common_prefixes
+
+            for obj in results:
+                if isinstance(obj, CommonPrefixInfo):
+                    info = self._fill_dir_info(bucket, obj)
+                elif obj.key.endswith("/"):
+                    info = self._fill_dir_info(bucket, None, obj.key)
+                else:
+                    info = self._fill_file_info(obj, bucket, versions)
+
+                yield info if detail else info["name"]
+
     def info(
         self,
         path: str,
@@ -392,7 +471,10 @@ class TosFileSystem(AbstractFileSystem):
         if not self.isdir(path):
             raise NotADirectoryError(f"{path} is not a directory.")
 
-        if len(self._listdir(bucket, max_items=1, prefix=key.rstrip("/") + "/")) > 0:
+        if (
+            len(self._listobjects(bucket, max_items=1, prefix=key.rstrip("/") + "/"))
+            > 0
+        ):
             raise TosfsError(f"Directory {path} is not empty.")
 
         retryable_func_executor(
@@ -1683,40 +1765,6 @@ class TosFileSystem(AbstractFileSystem):
         include_self: bool = False,
         versions: bool = False,
     ) -> List[dict]:
-        """List objects in a directory.
-
-        Parameters
-        ----------
-        path : str
-            The path to list.
-        max_items : int, optional
-            The maximum number of items to return (default is 1000).
-        delimiter : str, optional
-            The delimiter to use for grouping objects (default is '/').
-        prefix : str, optional
-            The prefix to use for filtering objects (default is '').
-        include_self : bool, optional
-            Whether to include the directory itself in the listing (default is False).
-        versions : bool, optional
-            Whether to list object versions (default is False).
-
-        Returns
-        -------
-        List[dict]
-            A list of objects in the directory.
-
-        Raises
-        ------
-        ValueError
-            If `versions` is specified but the filesystem is not version aware.
-        tos.exceptions.TosClientError
-            If there is a client error while listing the objects.
-        tos.exceptions.TosServerError
-            If there is a server error while listing the objects.
-        TosfsError
-            If there is an unknown error while listing the objects.
-
-        """
         bucket, key, _ = self._split_path(path)
         if not prefix:
             prefix = ""
@@ -1726,7 +1774,7 @@ class TosFileSystem(AbstractFileSystem):
         logger.debug("Get directory listing for %s", path)
         dirs = []
         files = []
-        for obj in self._listdir(
+        for obj in self._listobjects(
             bucket,
             max_items=max_items,
             delimiter=delimiter,
@@ -1744,7 +1792,7 @@ class TosFileSystem(AbstractFileSystem):
 
         return files
 
-    def _listdir(
+    def _listobjects(
         self,
         bucket: str,
         max_items: int = LS_OPERATION_DEFAULT_MAX_ITEMS,
@@ -1753,42 +1801,6 @@ class TosFileSystem(AbstractFileSystem):
         include_self: bool = False,
         versions: bool = False,
     ) -> List[Union[CommonPrefixInfo, ListedObject, ListedObjectVersion]]:
-        """List objects in a bucket.
-
-        Parameters
-        ----------
-        bucket : str
-            The bucket name.
-        max_items : int, optional
-            The maximum number of items to return (default is 1000).
-        delimiter : str, optional
-            The delimiter to use for grouping objects (default is '/').
-        prefix : str, optional
-            The prefix to use for filtering objects (default is '').
-        include_self : bool, optional
-            Whether to include the bucket itself in the listing (default is False).
-        versions : bool, optional
-            Whether to list object versions (default is False).
-
-        Returns
-        -------
-        List[Union[CommonPrefixInfo, ListedObject, ListedObjectVersion]]
-            A list of objects in the bucket.
-            The list may contain `CommonPrefixInfo` for directories,
-            `ListedObject` for files, and `ListedObjectVersion` for versioned objects.
-
-        Raises
-        ------
-        ValueError
-            If `versions` is specified but the filesystem is not version aware.
-        tos.exceptions.TosClientError
-            If there is a client error while listing the objects.
-        tos.exceptions.TosServerError
-            If there is a server error while listing the objects.
-        TosfsError
-            If there is an unknown error while listing the objects.
-
-        """
         if versions and not self.version_aware:
             raise ValueError(
                 "versions cannot be specified if the filesystem is "
