@@ -265,14 +265,14 @@ def test_put_file(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -
 
     bucket, key, _ = tosfs._split_path(rpath)
     with tosfs.open(rpath, "r") as f:
-        assert f.read().decode() == "test content"
+        assert f.read() == "test content"
 
     with open(lpath, "w") as f:
         f.write("hello world")
 
     tosfs.put_file(lpath, rpath)
     with tosfs.open(rpath, "r") as f:
-        assert f.read().decode() == "hello world"
+        assert f.read() == "hello world"
 
     tosfs.rm_file(rpath)
     assert not tosfs.exists(rpath)
@@ -280,7 +280,7 @@ def test_put_file(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -
     tosfs.put(lpath, f"{bucket}/{temporary_workspace}")
     assert tosfs.exists(f"{bucket}/{temporary_workspace}/{file_name}")
     with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "r") as f:
-        assert f.read().decode() == "hello world"
+        assert f.read() == "hello world"
 
     with pytest.raises(IsADirectoryError):
         tosfs.put_file(temp_dir, f"{bucket}/{temporary_workspace}")
