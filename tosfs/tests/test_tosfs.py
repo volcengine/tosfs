@@ -57,7 +57,7 @@ def test_ls_dir(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> 
 
 def test_inner_rm(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
     file_name = random_str()
-    tosfs.tos_client.put_object(bucket=bucket, key=f"{temporary_workspace}/{file_name}")
+    tosfs.touch(f"{bucket}/{temporary_workspace}/{file_name}")
     assert f"{bucket}/{temporary_workspace}/{file_name}" in tosfs.ls(
         f"{bucket}/{temporary_workspace}", detail=False
     )
@@ -94,7 +94,7 @@ def test_rmdir(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> N
         tosfs.rmdir(bucket)
 
     file_name = random_str()
-    tosfs.tos_client.put_object(bucket=bucket, key=f"{temporary_workspace}/{file_name}")
+    tosfs.touch(f"{bucket}/{temporary_workspace}/{file_name}")
     assert f"{bucket}/{temporary_workspace}/{file_name}" in tosfs.ls(
         f"{bucket}/{temporary_workspace}", detail=False
     )
@@ -129,9 +129,8 @@ def test_touch(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> N
     assert tosfs.exists(f"{bucket}/{temporary_workspace}/{file_name}")
 
     tosfs.rm_file(f"{bucket}/{temporary_workspace}/{file_name}")
-    tosfs.tos_client.put_object(
-        bucket=bucket, key=f"{temporary_workspace}/{file_name}", content="hello world"
-    )
+    with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "w") as f:
+        f.write("hello world")
     assert tosfs.info(f"{bucket}/{temporary_workspace}/{file_name}")["size"] > 0
     tosfs.touch(f"{bucket}/{temporary_workspace}/{file_name}", truncate=True)
     assert tosfs.info(f"{bucket}/{temporary_workspace}/{file_name}")["size"] == 0
@@ -147,14 +146,14 @@ def test_isdir(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> N
     assert not tosfs.isdir(f"{bucket}/{temporary_workspace}/nonexistent/")
 
     file_name = random_str()
-    tosfs.tos_client.put_object(bucket=bucket, key=f"{temporary_workspace}/{file_name}")
+    tosfs.touch(f"{bucket}/{temporary_workspace}/{file_name}")
     assert not tosfs.isdir(f"{bucket}/{temporary_workspace}/{file_name}")
     assert not tosfs.isdir(f"{bucket}/{temporary_workspace}/{file_name}/")
 
 
 def test_isfile(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
     file_name = random_str()
-    tosfs.tos_client.put_object(bucket=bucket, key=f"{temporary_workspace}/{file_name}")
+    tosfs.touch(f"{bucket}/{temporary_workspace}/{file_name}")
     assert tosfs.isfile(f"{bucket}/{temporary_workspace}/{file_name}")
     assert not tosfs.isfile(f"{bucket}/{temporary_workspace}/{file_name}/")
     assert not tosfs.isfile(f"{bucket}/{temporary_workspace}/nonexistfile")
@@ -175,7 +174,7 @@ def test_exists_object(
     tosfs: TosFileSystem, bucket: str, temporary_workspace: str
 ) -> None:
     file_name = random_str()
-    tosfs.tos_client.put_object(bucket=bucket, key=f"{temporary_workspace}/{file_name}")
+    tosfs.touch(f"{bucket}/{temporary_workspace}/{file_name}")
     assert tosfs.exists(f"{bucket}/{temporary_workspace}")
     assert tosfs.exists(f"{bucket}/{temporary_workspace}/")
     assert tosfs.exists(f"{bucket}/{temporary_workspace}/{file_name}")
@@ -265,31 +264,23 @@ def test_put_file(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -
     assert tosfs.exists(rpath)
 
     bucket, key, _ = tosfs._split_path(rpath)
-    assert (
-        tosfs.tos_client.get_object(bucket, key).content.read().decode()
-        == "test content"
-    )
+    with tosfs.open(rpath, "r") as f:
+        assert f.read().decode() == "test content"
 
     with open(lpath, "w") as f:
         f.write("hello world")
 
     tosfs.put_file(lpath, rpath)
-    assert (
-        tosfs.tos_client.get_object(bucket, key).content.read().decode()
-        == "hello world"
-    )
+    with tosfs.open(rpath, "r") as f:
+        assert f.read().decode() == "hello world"
 
     tosfs.rm_file(rpath)
     assert not tosfs.exists(rpath)
 
     tosfs.put(lpath, f"{bucket}/{temporary_workspace}")
     assert tosfs.exists(f"{bucket}/{temporary_workspace}/{file_name}")
-    assert (
-        tosfs.tos_client.get_object(bucket, f"{temporary_workspace}/{file_name}")
-        .content.read()
-        .decode()
-        == "hello world"
-    )
+    with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "r") as f:
+        assert f.read().decode() == "hello world"
 
     with pytest.raises(IsADirectoryError):
         tosfs.put_file(temp_dir, f"{bucket}/{temporary_workspace}")
@@ -302,10 +293,8 @@ def test_put_file(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -
 
     # test mpu
     tosfs.put_file(lpath, rpath, chunksize=2 * 1024 * 1024)
-    assert (
-        tosfs.tos_client.get_object(bucket, key).content.read()
-        == b"a" * 1024 * 1024 * 6
-    )
+    with tosfs.open(rpath, "rb") as f:
+        assert f.read() == b"a" * 1024 * 1024 * 6
 
 
 def test_get_file(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
@@ -316,7 +305,8 @@ def test_get_file(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -
     assert not os.path.exists(lpath)
 
     bucket, key, _ = tosfs._split_path(rpath)
-    tosfs.tos_client.put_object(bucket=bucket, key=key, content=file_content)
+    with tosfs.open(rpath, "w") as f:
+        f.write(file_content)
 
     tosfs.get_file(rpath, lpath)
     with open(lpath, "r") as f:
@@ -694,39 +684,39 @@ def test_file_write_encdec(
     content = "你好"
     with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "wb") as f:
         f.write(content.encode("gbk"))
-    response = tosfs.tos_client.get_object(
-        bucket=bucket, key=f"{temporary_workspace}/{file_name}"
-    )
-    assert response.read().decode("gbk") == content
+    with tosfs.open(
+        f"{bucket}/{temporary_workspace}/{file_name}", "rb", encoding="gbk"
+    ) as f:
+        assert f.read() == content
 
     tosfs.touch(f"{bucket}/{temporary_workspace}/{file_name}")
 
     content = "\u00af\\_(\u30c4)_/\u00af"
     with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "wb") as f:
         f.write(content.encode("utf-16-le"))
-    response = tosfs.tos_client.get_object(
-        bucket=bucket, key=f"{temporary_workspace}/{file_name}"
-    )
-    assert response.read().decode("utf-16-le") == content
+    with tosfs.open(
+        f"{bucket}/{temporary_workspace}/{file_name}", "rb", encoding="utf-16-le"
+    ) as f:
+        assert f.read() == content
 
     with tosfs.open(
         f"{bucket}/{temporary_workspace}/{file_name}", "w", encoding="utf-8"
     ) as f:
         f.write("\u00af\\_(\u30c4)_/\u00af")
-    response = tosfs.tos_client.get_object(
-        bucket=bucket, key=f"{temporary_workspace}/{file_name}"
-    )
-    assert response.read().decode("utf-8") == content
+    with tosfs.open(
+        f"{bucket}/{temporary_workspace}/{file_name}", "r", encoding="utf-8"
+    ) as f:
+        assert f.read() == "\u00af\\_(\u30c4)_/\u00af"
 
     content = "Hello, World!"
     with tosfs.open(
         f"{bucket}/{temporary_workspace}/{file_name}", "w", encoding="ibm500"
     ) as f:
         f.write(content)
-    response = tosfs.tos_client.get_object(
-        bucket=bucket, key=f"{temporary_workspace}/{file_name}"
-    )
-    assert response.read().decode("ibm500") == content
+    with tosfs.open(
+        f"{bucket}/{temporary_workspace}/{file_name}", "r", encoding="ibm500"
+    ) as f:
+        assert f.read() == content
 
 
 def test_file_write_mpu(
