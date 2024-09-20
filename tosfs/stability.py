@@ -32,8 +32,10 @@ from tos.exceptions import TosClientError, TosError, TosServerError
 
 from tosfs.exceptions import TosfsError
 
+CONFLICT_CODE = "409"
+
 TOS_SERVER_RETRYABLE_STATUS_CODES = {
-    "409",  # CONFLICT
+    CONFLICT_CODE,  # CONFLICT
     "429",  # TOO_MANY_REQUESTS
     "500",  # INTERNAL_SERVER_ERROR
 }
@@ -93,13 +95,17 @@ def retryable_func_executor(
                 raise e
 
             if is_retryable_exception(e):
-                logger.warn("Retry TOS request in the %d times, error: %s", attempt, e)
+                logger.warning(
+                    "Retry TOS request in the %d times, error: %s", attempt, e
+                )
                 try:
                     time.sleep(min(1.7**attempt * 0.1, 15))
                 except InterruptedError as ie:
                     raise TosfsError(f"Request {func} interrupted.") from ie
             else:
                 raise e
+        # Note: maybe not all the retryable exceptions are warped by `TosError`
+        # Will pay attention to those cases
         except Exception as e:
             raise TosfsError(f"{e}") from e
 
@@ -112,13 +118,14 @@ def is_retryable_exception(e: TosError) -> bool:
 
 
 def _is_retryable_tos_server_exception(e: TosError) -> bool:
-    return (
-        isinstance(e, TosServerError)
-        and e.status_code in TOS_SERVER_RETRYABLE_STATUS_CODES
-        # exclude some special error code under 409(conflict) status code
-        # let it fast fail
-        and e.code not in TOS_SERVER_NOT_RETRYABLE_CONFLICT_ERROR_CODES
-    )
+    if not isinstance(e, TosServerError):
+        return False
+
+    # not all conflict errors are retryable
+    if e.status_code == CONFLICT_CODE:
+        return e.code not in TOS_SERVER_NOT_RETRYABLE_CONFLICT_ERROR_CODES
+
+    return e.status_code in TOS_SERVER_RETRYABLE_STATUS_CODES
 
 
 def _is_retryable_tos_client_exception(e: TosError) -> bool:
