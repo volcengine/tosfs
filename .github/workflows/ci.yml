@@ -1,6 +1,15 @@
-name: UnitTest
+name: CI
 
-on: [push]
+on:
+  push:
+    paths-ignore:
+      - '*.md'
+      - 'pyproject.toml'
+      - 'poetry.lock'
+      - 'Makefile'
+      - 'LICENSE'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.gitignore'
 
 jobs:
   build:
