@@ -30,7 +30,6 @@ from requests.exceptions import (
 )
 from tos.exceptions import TosClientError, TosError, TosServerError
 
-from tosfs.core import logger
 from tosfs.exceptions import TosfsError
 
 CONFLICT_CODE = "409"
@@ -155,5 +154,7 @@ def _get_sleep_time(err: TosError, retry_count: int) -> float:
         try:
             sleep_time = max(int(err.headers["retry-after"]), int(sleep_time))
         except Exception as e:
+            from tosfs.core import logger
+
             logger.warning("try to parse retry-after from headers error: {}".format(e))
     return sleep_time
