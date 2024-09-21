@@ -767,7 +767,7 @@ def test_file_write_mpu(
     file_name = random_str()
 
     # mock a content let the write logic trigger mpu:
-    content = "a" * 13 * 1024 * 1024
+    content = random_str(13 * 1024 * 1024)
     block_size = 4 * 1024 * 1024
     with tosfs.open(
         f"{bucket}/{temporary_workspace}/{file_name}", "w", block_size=block_size
@@ -777,6 +777,9 @@ def test_file_write_mpu(
     assert tosfs.info(f"{bucket}/{temporary_workspace}/{file_name}")["size"] == len(
         content
     )
+
+    with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "r") as f:
+        assert f.read() == content
 
 
 def test_file_write_mpu_threshold_check(
