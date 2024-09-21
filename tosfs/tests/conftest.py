@@ -38,6 +38,8 @@ def tosfs(_tosfs_env_prepare: None) -> TosFileSystem:
         endpoint_url=os.environ.get("TOS_ENDPOINT"),
         region=os.environ.get("TOS_REGION"),
         credentials_provider=EnvCredentialsProvider(),
+        multipart_size=4 << 20,
+        multipart_threshold=4 << 20,
     )
     return tosfs
 
