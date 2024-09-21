@@ -13,11 +13,11 @@
 # limitations under the License.
 
 import io
-import random
-import string
 from typing import Any
 
 import pytest
+
+from tosfs.utils import random_str
 
 
 def test_ls(fsspecfs: Any, bucket: str, temporary_workspace: str):
@@ -29,7 +29,7 @@ def test_ls(fsspecfs: Any, bucket: str, temporary_workspace: str):
 
 def test_copy(fsspecfs: Any, bucket: str, temporary_workspace: str):
     # Create a temporary directory and files
-    dir_name = "".join(random.choices(string.ascii_letters + string.digits, k=10))
+    dir_name = random_str()
     subdir_path = f"{bucket}/{temporary_workspace}/{dir_name}"
     fsspecfs.mkdir(subdir_path)
     file1_path = f"{subdir_path}/file1.txt"
@@ -122,7 +122,7 @@ def test_info(fsspecfs: Any, bucket: str, temporary_workspace: str):
 
 
 def test_write_and_read_bytes(fsspecfs: Any, bucket: str, temporary_workspace: str):
-    file_name = "".join(random.choices(string.ascii_letters + string.digits, k=10))
+    file_name = random_str()
     path_to_write = f"{bucket}/{temporary_workspace}/{file_name}.bin"
     data_to_write = b"Hello, World!"
 
@@ -140,7 +140,7 @@ def test_write_and_read_bytes(fsspecfs: Any, bucket: str, temporary_workspace: s
 
 
 def test_write_and_read_text(fsspecfs: Any, bucket: str, temporary_workspace: str):
-    file_name = "".join(random.choices(string.ascii_letters + string.digits, k=10))
+    file_name = random_str()
     path_to_write = f"{bucket}/{temporary_workspace}/{file_name}.txt"
     data_to_write = "Hello, World!"
 
@@ -158,7 +158,7 @@ def test_write_and_read_text(fsspecfs: Any, bucket: str, temporary_workspace: st
 
 
 def test_with_size(fsspecfs: Any, bucket: str, temporary_workspace: str):
-    file_name = "".join(random.choices(string.ascii_letters + string.digits, k=10))
+    file_name = random_str()
     path = f"{bucket}/{temporary_workspace}/{file_name}.txt"
 
     expected_file_size = 10
@@ -175,7 +175,7 @@ def test_with_size(fsspecfs: Any, bucket: str, temporary_workspace: str):
 
 
 def test_simple(fsspecfs: Any, bucket: str, temporary_workspace: str):
-    file_name = "".join(random.choices(string.ascii_letters + string.digits, k=10))
+    file_name = random_str()
     path = f"{bucket}/{temporary_workspace}/{file_name}.txt"
     data = b"a" * (10 * 1**10)
 
@@ -189,7 +189,7 @@ def test_simple(fsspecfs: Any, bucket: str, temporary_workspace: str):
 
 
 def test_write_large(fsspecfs: Any, bucket: str, temporary_workspace: str):
-    file_name = "".join(random.choices(string.ascii_letters + string.digits, k=10))
+    file_name = random_str()
     path = f"{bucket}/{temporary_workspace}/{file_name}.txt"
     mb = 2**20
     payload_size = int(2.5 * 1 * mb)
@@ -202,7 +202,7 @@ def test_write_large(fsspecfs: Any, bucket: str, temporary_workspace: str):
 
 
 def test_write_limit(fsspecfs: Any, bucket: str, temporary_workspace: str):
-    file_name = "".join(random.choices(string.ascii_letters + string.digits, k=10))
+    file_name = random_str()
     path = f"{bucket}/{temporary_workspace}/{file_name}.txt"
     mb = 2**20
     block_size = 1 * mb
@@ -216,7 +216,7 @@ def test_write_limit(fsspecfs: Any, bucket: str, temporary_workspace: str):
 
 
 def test_readline(fsspecfs: Any, bucket: str, temporary_workspace: str):
-    file_name = "".join(random.choices(string.ascii_letters + string.digits, k=10))
+    file_name = random_str()
     path = f"{bucket}/{temporary_workspace}/{file_name}.txt"
 
     lines_to_write = [b"First line\n", b"Second line\n", b"Third line"]
@@ -236,7 +236,7 @@ def test_readline(fsspecfs: Any, bucket: str, temporary_workspace: str):
 
 
 def test_readline_empty(fsspecfs: Any, bucket: str, temporary_workspace: str):
-    file_name = "".join(random.choices(string.ascii_letters + string.digits, k=10))
+    file_name = random_str()
     path = f"{bucket}/{temporary_workspace}/{file_name}.txt"
     data = b""
     with fsspecfs.open(path, "wb") as f:
@@ -247,7 +247,7 @@ def test_readline_empty(fsspecfs: Any, bucket: str, temporary_workspace: str):
 
 
 def test_readline_blocksize(fsspecfs: Any, bucket: str, temporary_workspace: str):
-    file_name = "".join(random.choices(string.ascii_letters + string.digits, k=10))
+    file_name = random_str()
     path = f"{bucket}/{temporary_workspace}/{file_name}.txt"
     data = b"ab\n" + b"a" * (1 * 2**20) + b"\nab"
     with fsspecfs.open(path, "wb") as f:
@@ -267,7 +267,7 @@ def test_readline_blocksize(fsspecfs: Any, bucket: str, temporary_workspace: str
 
 
 def test_next(fsspecfs: Any, bucket: str, temporary_workspace: str):
-    file_name = "".join(random.choices(string.ascii_letters + string.digits, k=10))
+    file_name = random_str()
     path = f"{bucket}/{temporary_workspace}/{file_name}.csv"
 
     csv_content = b"name,amount,id\nAlice,100,1\nBob,200,2\nCharlie,300,3\n"
@@ -285,7 +285,7 @@ def test_next(fsspecfs: Any, bucket: str, temporary_workspace: str):
 
 
 def test_iterable(fsspecfs: Any, bucket: str, temporary_workspace: str):
-    file_name = "".join(random.choices(string.ascii_letters + string.digits, k=10))
+    file_name = random_str()
     path = f"{bucket}/{temporary_workspace}/{file_name}"
     data = b"abc\n123"
     with fsspecfs.open(path, "wb") as f:
@@ -310,7 +310,7 @@ def test_iterable(fsspecfs: Any, bucket: str, temporary_workspace: str):
 def test_write_read_without_protocol(
     fsspecfs: Any, bucket: str, temporary_workspace: str
 ):
-    file_name = "".join(random.choices(string.ascii_letters + string.digits, k=10))
+    file_name = random_str()
     path_to_write = f"{bucket}/{temporary_workspace}/{file_name}.bin"
     path_without_protocol = fsspecfs._strip_protocol(path_to_write)
     data_to_write = b"Hello, World!"
@@ -557,8 +557,8 @@ def test_du(fsspecfs: Any, bucket: str, temporary_workspace: str):
 
 def test_isdir(fsspecfs: Any, bucket: str, temporary_workspace: str):
     # Setup
-    dir_name = "".join(random.choices(string.ascii_letters + string.digits, k=10))
-    file_name = "".join(random.choices(string.ascii_letters + string.digits, k=10))
+    dir_name = random_str()
+    file_name = random_str()
     dir_path = f"{bucket}/{temporary_workspace}/{dir_name}"
     file_path = f"{bucket}/{temporary_workspace}/{file_name}.txt"
     fsspecfs.mkdir(dir_path)
@@ -580,8 +580,8 @@ def test_isdir(fsspecfs: Any, bucket: str, temporary_workspace: str):
 
 def test_isfile(fsspecfs: Any, bucket: str, temporary_workspace: str):
     # Setup
-    dir_name = "".join(random.choices(string.ascii_letters + string.digits, k=10))
-    file_name = "".join(random.choices(string.ascii_letters + string.digits, k=10))
+    dir_name = random_str()
+    file_name = random_str()
     dir_path = f"{bucket}/{temporary_workspace}/{dir_name}"
     file_path = f"{bucket}/{temporary_workspace}/{file_name}.txt"
     fsspecfs.mkdir(dir_path)
@@ -602,10 +602,7 @@ def test_isfile(fsspecfs: Any, bucket: str, temporary_workspace: str):
 
 
 def test_rm(fsspecfs: Any, bucket: str, temporary_workspace: str):
-    file_names = [
-        "".join(random.choices(string.ascii_letters + string.digits, k=10))
-        for _ in range(5)
-    ]
+    file_names = [random_str() for _ in range(5)]
     paths_to_remove = [
         f"{bucket}/{temporary_workspace}/{file_name}.txt" for file_name in file_names
     ]
@@ -633,7 +630,7 @@ def test_rm(fsspecfs: Any, bucket: str, temporary_workspace: str):
 
 
 def test_cat_file(fsspecfs: Any, bucket: str, temporary_workspace: str):
-    file_name = "".join(random.choices(string.ascii_letters + string.digits, k=10))
+    file_name = random_str()
     path_to_write = f"{bucket}/{temporary_workspace}/{file_name}.bin"
     content = b"Hello, World! This is a test file."
     with fsspecfs.open(path_to_write, "wb") as f:
@@ -657,7 +654,7 @@ def test_cat_file(fsspecfs: Any, bucket: str, temporary_workspace: str):
 
 
 def test_cat(fsspecfs: Any, bucket: str, temporary_workspace: str):
-    dir_name = "".join(random.choices(string.ascii_letters + string.digits, k=10))
+    dir_name = random_str()
     subdir_path = f"{bucket}/{temporary_workspace}/{dir_name}"
     fsspecfs.mkdir(subdir_path)
     file1_path = f"{subdir_path}/file1.txt"
