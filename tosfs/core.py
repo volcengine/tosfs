@@ -1487,6 +1487,8 @@ class TosFileSystem(AbstractFileSystem):
         range_start: int,
         **kwargs: Any,
     ) -> Tuple[BinaryIO, int]:
+        if kwargs.get("callback") is not None:
+            kwargs.pop("callback")
         resp = retryable_func_executor(
             lambda: self.tos_client.get_object(
                 bucket,
