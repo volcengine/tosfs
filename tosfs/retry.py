@@ -18,7 +18,6 @@ import time
 from typing import Any, Optional, Tuple
 
 import requests
-from poetry.core.masonry.builders.wheel import logger
 from requests.exceptions import (
     ConnectTimeout,
     HTTPError,
@@ -31,6 +30,7 @@ from requests.exceptions import (
 )
 from tos.exceptions import TosClientError, TosError, TosServerError
 
+from tosfs.core import logger
 from tosfs.exceptions import TosfsError
 
 CONFLICT_CODE = "409"
