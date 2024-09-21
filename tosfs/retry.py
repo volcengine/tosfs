@@ -153,7 +153,7 @@ def _get_sleep_time(err: TosError, retry_count: int) -> float:
         and "retry-after" in err.headers
     ):
         try:
-            sleep_time = max(int(err.headers["retry-after"]), sleep_time)
+            sleep_time = max(int(err.headers["retry-after"]), int(sleep_time))
         except Exception as e:
             logger.warning("try to parse retry-after from headers error: {}".format(e))
     return sleep_time
