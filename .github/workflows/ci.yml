@@ -1,7 +1,7 @@
 name: CI
 
 on:
-  path:
+  push:
     paths-ignore:
       - '*.md'
       - 'pyproject.toml'
