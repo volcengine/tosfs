@@ -13,11 +13,12 @@
 # limitations under the License.
 
 """The module contains utility functions for the tosfs stability."""
-
+import math
 import time
 from typing import Any, Optional, Tuple
 
 import requests
+from poetry.core.masonry.builders.wheel import logger
 from requests.exceptions import (
     ConnectTimeout,
     HTTPError,
@@ -33,11 +34,14 @@ from tos.exceptions import TosClientError, TosError, TosServerError
 from tosfs.exceptions import TosfsError
 
 CONFLICT_CODE = "409"
+TOO_MANY_REQUESTS_CODE = "429"
+SERVICE_UNAVAILABLE = "503"
 
 TOS_SERVER_RETRYABLE_STATUS_CODES = {
-    CONFLICT_CODE,  # CONFLICT
-    "429",  # TOO_MANY_REQUESTS
-    "500",  # INTERNAL_SERVER_ERROR
+    CONFLICT_CODE,
+    TOO_MANY_REQUESTS_CODE,
+    "500",  # INTERNAL_SERVER_ERROR,
+    SERVICE_UNAVAILABLE,
 }
 
 TOS_SERVER_NOT_RETRYABLE_CONFLICT_ERROR_CODES = {
@@ -68,6 +72,8 @@ TOS_CLIENT_RETRYABLE_EXCEPTIONS = {
 }
 
 MAX_RETRY_NUM = 20
+SLEEP_BASE_SECONDS = 0.1
+SLEEP_MAX_SECONDS = 60
 
 
 def retryable_func_executor(
@@ -99,7 +105,8 @@ def retryable_func_executor(
                     "Retry TOS request in the %d times, error: %s", attempt, e
                 )
                 try:
-                    time.sleep(min(1.7**attempt * 0.1, 15))
+                    sleep_time = _get_sleep_time(e, attempt)
+                    time.sleep(sleep_time)
                 except InterruptedError as ie:
                     raise TosfsError(f"Request {func} interrupted.") from ie
             else:
@@ -132,3 +139,21 @@ def _is_retryable_tos_client_exception(e: TosError) -> bool:
     return isinstance(e, TosClientError) and any(
         isinstance(e.cause, excp) for excp in TOS_CLIENT_RETRYABLE_EXCEPTIONS
     )
+
+
+def _get_sleep_time(err: TosError, retry_count: int) -> float:
+    sleep_time = SLEEP_BASE_SECONDS * math.pow(2, retry_count)
+    sleep_time = min(sleep_time, SLEEP_MAX_SECONDS)
+    if (
+        isinstance(err, TosServerError)
+        and (
+            err.status_code == TOO_MANY_REQUESTS_CODE
+            or err.status_code == SERVICE_UNAVAILABLE
+        )
+        and "retry-after" in err.headers
+    ):
+        try:
+            sleep_time = max(int(err.headers["retry-after"]), sleep_time)
+        except Exception as e:
+            logger.warning("try to parse retry-after from headers error: {}".format(e))
+    return sleep_time
