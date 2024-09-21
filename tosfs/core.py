@@ -57,7 +57,7 @@ from tosfs.consts import (
 )
 from tosfs.exceptions import TosfsError
 from tosfs.fsspec_utils import glob_translate
-from tosfs.stability import retryable_func_executor
+from tosfs.retry import retryable_func_executor
 from tosfs.utils import find_bucket_key, get_brange
 
 logger = logging.getLogger("tosfs")

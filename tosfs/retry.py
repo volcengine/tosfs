@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""The module contains utility functions for the tosfs stability."""
+"""The module contains retry utility functions for the tosfs stability."""
 import math
 import time
 from typing import Any, Optional, Tuple
