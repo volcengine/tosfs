@@ -19,6 +19,7 @@ from typing import Any, Optional, Tuple
 
 import requests
 from requests.exceptions import (
+    ChunkedEncodingError,
     ConnectTimeout,
     HTTPError,
     ProxyError,
@@ -68,6 +69,7 @@ TOS_CLIENT_RETRYABLE_EXCEPTIONS = {
     InterruptedError,
     ConnectionResetError,
     ConnectionError,
+    ChunkedEncodingError,
 }
 
 MAX_RETRY_NUM = 20
