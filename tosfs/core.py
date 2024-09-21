@@ -14,13 +14,11 @@
 
 """The core module of TOSFS."""
 import io
-import itertools
 import logging
 import mimetypes
 import os
 import tempfile
 import time
-from concurrent.futures import ThreadPoolExecutor
 from glob import has_magic
 from typing import Any, BinaryIO, Collection, Generator, List, Optional, Tuple, Union
 
@@ -31,7 +29,6 @@ from fsspec.utils import setup_logging as setup_logger
 from tos.exceptions import TosClientError, TosServerError
 from tos.models import CommonPrefixInfo
 from tos.models2 import (
-    CreateMultipartUploadOutput,
     ListedObject,
     ListedObjectVersion,
     ListObjectType2Output,
@@ -57,6 +54,7 @@ from tosfs.consts import (
 )
 from tosfs.exceptions import TosfsError
 from tosfs.fsspec_utils import glob_translate
+from tosfs.mpu import MultipartUploader
 from tosfs.retry import retryable_func_executor
 from tosfs.utils import find_bucket_key, get_brange
 
@@ -2032,19 +2030,18 @@ class TosFile(AbstractBufferedFile):
         self.path = path
         self.mode = mode
         self.autocommit = autocommit
-        self.mpu: CreateMultipartUploadOutput = None
-        self.parts: list = []
         self.append_block = False
         self.buffer: Optional[io.BytesIO] = io.BytesIO()
 
-        self.staging_dirs = itertools.cycle(fs.multipart_staging_dirs)
-        self.part_size = fs.multipart_size
-        self.thread_pool_size = fs.multipart_thread_pool_size
-        self.staging_buffer_size = fs.multipart_staging_buffer_size
-        self.multipart_threshold = fs.multipart_threshold
-        self.executor = ThreadPoolExecutor(max_workers=self.thread_pool_size)
-        self.staging_files: list[str] = []
-        self.staging_buffer: io.BytesIO = io.BytesIO()
+        self.multipart_uploader = MultipartUploader(
+            fs=fs,
+            bucket=bucket,
+            key=key,
+            part_size=fs.multipart_size,
+            thread_pool_size=fs.multipart_thread_pool_size,
+            staging_buffer_size=fs.multipart_staging_buffer_size,
+            multipart_threshold=fs.multipart_threshold,
+        )
 
         if "a" in mode and fs.exists(path):
             head = retryable_func_executor(
@@ -2097,110 +2094,19 @@ class TosFile(AbstractBufferedFile):
             self.autocommit
             and not self.append_block
             and final
-            and self.tell() < max(self.blocksize, self.multipart_threshold)
+            and self.tell()
+            < max(self.blocksize, self.multipart_uploader.multipart_threshold)
         ):
             # only happens when closing small file, use one-shot PUT
             pass
         else:
-            self.parts = []
-
-            self.mpu = retryable_func_executor(
-                lambda: self.fs.tos_client.create_multipart_upload(
-                    self.bucket, self.key
-                ),
-                max_retry_num=self.fs.max_retry_num,
-            )
-
-            if self.append_block:
-                # use existing data in key when appending,
-                # and block is big enough
-                out = retryable_func_executor(
-                    lambda: self.fs.tos_client.upload_part_copy(
-                        bucket=self.bucket,
-                        key=self.key,
-                        part_number=1,
-                        upload_id=self.mpu.upload_id,
-                    ),
-                    max_retry_num=self.fs.max_retry_num,
-                )
-
-                self.parts.append({"PartNumber": out.part_number, "ETag": out.etag})
-
-            self._upload_multiple_chunks(bucket, key)
+            self.multipart_uploader.initiate_upload()
+            self.multipart_uploader.upload_multiple_chunks(self.buffer)
 
         if self.autocommit and final:
             self.commit()
 
         return not final
-
-    def _upload_multiple_chunks(self, bucket: str, key: str) -> None:
-        if self.buffer:
-            self.buffer.seek(0)
-            while True:
-                chunk = self.buffer.read(self.part_size)
-                if not chunk:
-                    break
-
-                self._write_to_staging_buffer(chunk)
-
-    def _write_to_staging_buffer(self, chunk: bytes) -> None:
-        self.staging_buffer.write(chunk)
-        if self.staging_buffer.tell() >= self.staging_buffer_size:
-            self._flush_staging_buffer()
-
-    def _flush_staging_buffer(self) -> None:
-        if self.staging_buffer.tell() == 0:
-            return
-
-        self.staging_buffer.seek(0)
-        staging_dir = next(self.staging_dirs)
-        with tempfile.NamedTemporaryFile(delete=False, dir=staging_dir) as tmp:
-            tmp.write(self.staging_buffer.read())
-            self.staging_files.append(tmp.name)
-
-        self.staging_buffer = io.BytesIO()
-
-    def _upload_staged_files(self) -> None:
-        self._flush_staging_buffer()
-        futures = []
-        for i, staging_file in enumerate(self.staging_files):
-            part_number = i + 1
-            futures.append(
-                self.executor.submit(
-                    self._upload_part_from_file, staging_file, part_number
-                )
-            )
-
-        for future in futures:
-            part_info = future.result()
-            self.parts.append(part_info)
-
-        self.staging_files = []
-
-    def _upload_part_from_file(self, staging_file: str, part_number: int) -> PartInfo:
-        with open(staging_file, "rb") as f:
-            content = f.read()
-
-        out = retryable_func_executor(
-            lambda: self.fs.tos_client.upload_part(
-                bucket=self.bucket,
-                key=self.key,
-                part_number=part_number,
-                upload_id=self.mpu.upload_id,
-                content=content,
-            ),
-            max_retry_num=self.fs.max_retry_num,
-        )
-
-        os.remove(staging_file)
-        return PartInfo(
-            part_number=part_number,
-            etag=out.etag,
-            part_size=len(content),
-            offset=None,
-            hash_crc64_ecma=None,
-            is_completed=None,
-        )
 
     def _fetch_range(self, start: int, end: int) -> bytes:
         if start == end:
@@ -2231,9 +2137,9 @@ class TosFile(AbstractBufferedFile):
         if self.tell() == 0:
             if self.buffer is not None:
                 logger.debug("Empty file committed %s", self)
-                self._abort_mpu()
+                self.multipart_uploader.abort_upload()
                 self.fs.touch(self.path, **self.kwargs)
-        elif not self.staging_files:
+        elif not self.multipart_uploader.staging_files:
             if self.buffer is not None:
                 logger.debug("One-shot upload of %s", self)
                 self.buffer.seek(0)
@@ -2247,17 +2153,9 @@ class TosFile(AbstractBufferedFile):
             else:
                 raise RuntimeError
         else:
-            self._upload_staged_files()
             logger.debug("Complete multi-part upload for %s ", self)
-            write_result = retryable_func_executor(
-                lambda: self.fs.tos_client.complete_multipart_upload(
-                    self.bucket,
-                    self.key,
-                    upload_id=self.mpu.upload_id,
-                    parts=self.parts,
-                ),
-                max_retry_num=self.fs.max_retry_num,
-            )
+            self.multipart_uploader._upload_staged_files()
+            self.multipart_uploader.complete_upload()
 
         if self.fs.version_aware:
             self.version_id = write_result.version_id
@@ -2266,15 +2164,5 @@ class TosFile(AbstractBufferedFile):
 
     def discard(self) -> None:
         """Close the file without writing."""
-        self._abort_mpu()
-        self.buffer = None  # file becomes unusable
-
-    def _abort_mpu(self) -> None:
-        if self.mpu:
-            retryable_func_executor(
-                lambda: self.fs.tos_client.abort_multipart_upload(
-                    self.bucket, self.key, self.mpu.upload_id
-                ),
-                max_retry_num=self.fs.max_retry_num,
-            )
-            self.mpu = None
+        self.multipart_uploader.abort_upload()
+        self.buffer = None
