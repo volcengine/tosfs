@@ -13,11 +13,12 @@
 # limitations under the License.
 
 import io
+import os
 from typing import Any
 
 import pytest
 
-from tosfs.utils import random_str
+from tosfs.utils import create_temp_dir, random_str
 
 
 def test_ls(fsspecfs: Any, bucket: str, temporary_workspace: str):
@@ -695,3 +696,94 @@ def test_cat(fsspecfs: Any, bucket: str, temporary_workspace: str):
     assert non_existent_in_result, "non_existent_path is not an Exception in the result"
 
     fsspecfs.rm(subdir_path, recursive=True)
+
+
+def test_mv(fsspecfs: Any, bucket: str, temporary_workspace: str):
+    source_folder = f"{bucket}/{temporary_workspace}/source_folder"
+    target_folder = f"{bucket}/{temporary_workspace}/target_folder"
+    test_file_name = "test_file.txt"
+    renamed_file_name = "renamed_file.txt"
+    test_file_content = b"Hello, ProtonFS!"
+    target_file_content = b"Old content"
+
+    fsspecfs.mkdir(source_folder)
+    fsspecfs.mkdir(target_folder)
+    source_file_path = f"{source_folder}/{test_file_name}"
+    target_file_path = f"{target_folder}/{test_file_name}"
+    with fsspecfs.open(source_file_path, "wb") as f:
+        f.write(test_file_content)
+
+    with fsspecfs.open(target_file_path, "wb") as f:
+        f.write(target_file_content)
+
+    fsspecfs.mv(source_file_path, target_file_path)
+
+    assert not fsspecfs.exists(
+        source_file_path
+    ), "Source file should not exist after move"
+    assert fsspecfs.exists(target_file_path), "Target file should exist after move"
+
+    with fsspecfs.open(target_file_path, "rb") as f:
+        content = f.read()
+        assert (
+            content == test_file_content
+        ), "Target file content should be overwritten by source file content"
+
+    renamed_file_path = f"{target_folder}/{renamed_file_name}"
+    fsspecfs.mv(target_file_path, renamed_file_path)
+
+    assert not fsspecfs.exists(
+        target_file_path
+    ), "Original file should not exist after rename"
+    assert fsspecfs.exists(renamed_file_path), "Renamed file should exist"
+
+
+def test_get(fsspecfs: Any, bucket: str, temporary_workspace: str):
+    remote_file_path = f"{bucket}/{temporary_workspace}/test_get_file.txt"
+    local_temp_dir = create_temp_dir()
+    local_file_path = f"{local_temp_dir}/test_get_file.txt"
+    test_data = b"Data for testing ProtonFileSystem#get method."
+
+    if os.path.exists(local_file_path):
+        os.remove(local_file_path)
+
+    with fsspecfs.open(remote_file_path, "wb") as f:
+        f.write(test_data)
+
+    fsspecfs.get(remote_file_path, local_file_path)
+
+    assert os.path.exists(local_file_path), "The file was not copied to the local path."
+    with open(local_file_path, "rb") as f:
+        local_data = f.read()
+        assert (
+            local_data == test_data
+        ), "The data in the local file does not match the expected data."
+
+    os.remove(local_file_path)
+
+
+def test_put(fsspecfs: Any, bucket: str, temporary_workspace: str):
+    file_name = random_str()
+    local_temp_dir = create_temp_dir()
+    local_file_path = f"{local_temp_dir}/{file_name}"
+    test_data = b"Data for testing ProtonFileSystem put method."
+
+    with open(local_file_path, "wb") as f:
+        f.write(test_data)
+
+    remote_file_path = f"{bucket}/{temporary_workspace}/{file_name}"
+    fsspecfs.put(local_file_path, remote_file_path)
+
+    assert fsspecfs.exists(
+        remote_file_path
+    ), "The file should exist in the remote location after upload."
+
+    downloaded_file_path = f"{local_temp_dir}/downloaded_{file_name}"
+    fsspecfs.get(remote_file_path, downloaded_file_path)
+    with open(downloaded_file_path, "rb") as f:
+        downloaded_data = f.read()
+        assert (
+            downloaded_data == test_data
+        ), "The downloaded file's contents should match the original test data."
+    os.remove(downloaded_file_path)
+    os.remove(local_file_path)
