@@ -2060,6 +2060,12 @@ class TosFile(AbstractBufferedFile):
                 self.append_block = True
             self.loc = loc
 
+        if "w" in mode:
+            # check the local staging dir if not exist, create it
+            for staging_dir in fs.multipart_staging_dirs:
+                if not os.path.exists(staging_dir):
+                    os.makedirs(staging_dir)
+
     def _initiate_upload(self) -> None:
         """Create remote file/upload."""
         if self.autocommit and not self.append_block and self.tell() < self.blocksize:
