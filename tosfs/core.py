@@ -152,6 +152,7 @@ class TosFileSystem(AbstractFileSystem):
             WARN-level logs are printed.
         version_aware : bool, optional
             Whether the filesystem is version aware (default is False).
+            Currently, not been supported, please DO NOT set to True.
         credentials_provider : object, optional
             The credentials provider for the TOS service.
         default_block_size : int, optional
@@ -199,6 +200,9 @@ class TosFileSystem(AbstractFileSystem):
             enable_verify_ssl=False,
             disable_encoding_meta=True,
         )
+        if version_aware:
+            raise ValueError("Currently, version_aware is not supported.")
+
         self.version_aware = version_aware
         self.default_block_size = (
             default_block_size or FILE_OPERATION_READ_WRITE_BUFFER_SIZE
