@@ -55,3 +55,36 @@ tosfs = TosFileSystem(
     credentials_provider=EnvCredentialsProvider, # must
 )
 ```
+
+### Access FS and file operation APIs
+
+After getting the instance of `TosFileSystem` by following the above guidance,
+now we can access fs and file operation apis, e.g.
+
+```python
+# list
+tosfs.ls("")
+tosfs.ls("mybucket", detail=False)
+tosfs.ls("mybucket/rootpath/", detail=False)
+
+# file read/write
+with tosfs.open('bucket/root/text.txt', mode='wb') as f:
+    f.write('hello tosfs!')
+    
+with tosfs.open('bucket/root/text.txt', mode='rb') as f:
+    content = f.read()
+    print(content)
+```
+
+## Contributing
+Contributions are very welcome. To learn more, see the [Contributor Guide](https://github.com/volcengine/tosfs/blob/main/CONTRIBUTING.md).
+
+## License
+Distributed under the terms of the [Apache 2.0 license](https://github.com/volcengine/tosfs/blob/main/LICENSE), Tosfs is free and open source software.
+
+## Issues
+If you encounter any problems, please [file an issue](https://github.com/volcengine/tosfs/issues/new/choose) along with a detailed description.
+
+
+
+
