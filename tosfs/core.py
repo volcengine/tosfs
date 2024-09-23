@@ -2091,7 +2091,7 @@ class TosFile(AbstractBufferedFile):
 
     def _fetch_range(self, start: int, end: int) -> bytes:
         if start == end:
-            logger.debug(
+            logger.warning(
                 "skip fetch for negative range - bucket=%s,key=%s,start=%d,end=%d",
                 self.bucket,
                 self.key,
@@ -2102,13 +2102,16 @@ class TosFile(AbstractBufferedFile):
         logger.debug("Fetch: %s/%s, %s-%s", self.bucket, self.key, start, end)
 
         def fetch() -> bytes:
-            temp_buffer = io.BytesIO()
-            for chunk in self.fs.tos_client.get_object(
-                self.bucket, self.key, self.version_id, range_start=start, range_end=end
-            ):
-                temp_buffer.write(chunk)
-            temp_buffer.seek(0)
-            return temp_buffer.read()
+            with io.BytesIO() as temp_buffer:
+                for chunk in self.fs.tos_client.get_object(
+                    self.bucket,
+                    self.key,
+                    self.version_id,
+                    range_start=start,
+                    range_end=end,
+                ):
+                    temp_buffer.write(chunk)
+                return temp_buffer.getvalue()
 
         return retryable_func_executor(fetch, max_retry_num=self.fs.max_retry_num)
 
