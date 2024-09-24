@@ -18,6 +18,7 @@ import time
 from typing import Any, Optional, Tuple
 
 import requests
+from requests import RequestException
 from requests.exceptions import (
     ChunkedEncodingError,
     ConnectTimeout,
@@ -70,6 +71,7 @@ TOS_CLIENT_RETRYABLE_EXCEPTIONS = {
     ConnectionResetError,
     ConnectionError,
     ChunkedEncodingError,
+    RequestException,
 }
 
 MAX_RETRY_NUM = 20
@@ -142,9 +144,14 @@ def _is_retryable_tos_server_exception(e: TosError) -> bool:
 
 
 def _is_retryable_tos_client_exception(e: TosError) -> bool:
-    return isinstance(e, TosClientError) and any(
-        isinstance(e.cause, excp) for excp in TOS_CLIENT_RETRYABLE_EXCEPTIONS
-    )
+    if isinstance(e, TosClientError):
+        cause = e.cause
+        while cause is not None:
+            for excp in TOS_CLIENT_RETRYABLE_EXCEPTIONS:
+                if isinstance(cause, excp):
+                    return True
+            cause = getattr(cause, "cause", None)
+    return False
 
 
 def _get_sleep_time(err: TosError, retry_count: int) -> float:

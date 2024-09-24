@@ -77,9 +77,9 @@ class MultipartUploader:
     def _write_to_staging_buffer(self, chunk: bytes) -> None:
         self.staging_buffer.write(chunk)
         if self.staging_buffer.tell() >= self.part_size:
-            self._flush_staging_buffer()
+            self._flush_staging_buffer(False)
 
-    def _flush_staging_buffer(self) -> None:
+    def _flush_staging_buffer(self, final: bool = False) -> None:
         if self.staging_buffer.tell() == 0:
             return
 
@@ -93,13 +93,22 @@ class MultipartUploader:
                 self.staging_files.append(tmp.name)
                 buffer_size -= self.part_size
 
-        # Move remaining data to a new buffer
-        remaining_data = self.staging_buffer.read()
-        self.staging_buffer = io.BytesIO()
-        self.staging_buffer.write(remaining_data)
+        if not final:
+            # Move remaining data to a new buffer
+            remaining_data = self.staging_buffer.read()
+            self.staging_buffer = io.BytesIO()
+            self.staging_buffer.write(remaining_data)
+        else:
+            staging_dir = next(self.staging_dirs)
+            with tempfile.NamedTemporaryFile(delete=False, dir=staging_dir) as tmp:
+                tmp.write(self.staging_buffer.read())
+                self.staging_files.append(tmp.name)
+                buffer_size -= self.part_size
+
+            self.staging_buffer = io.BytesIO()
 
     def _upload_staged_files(self) -> None:
-        self._flush_staging_buffer()
+        self._flush_staging_buffer(True)
         futures = []
         for i, staging_file in enumerate(self.staging_files):
             part_number = i + 1
