@@ -136,7 +136,7 @@ class TosFileSystem(AbstractFileSystem):
             The maximum number of HTTP connections that can be opened in the
             connection pool (default is 1024).
         connection_time : int, optional
-            The time to keep a connection open (default is 10).
+            The time to keep a connection open in seconds (default is 10).
         socket_timeout : int, optional
             The socket read and write timeout time for a single request after
             a connection is successfully established, in seconds.

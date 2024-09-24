@@ -12,23 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: CI
+name: Scheduled Workflow
 
 on:
-  push:
-    paths-ignore:
-      - '*.md'
-      - 'pyproject.toml'
-      - 'poetry.lock'
-      - 'Makefile'
-      - 'LICENSE'
-      - '.github/ISSUE_TEMPLATE/**'
-      - '.gitignore'
+  schedule:
+    # Runs every day at midnight
+    - cron: '0 0 * * *'
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 180 # 3hours
     strategy:
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
