@@ -76,20 +76,27 @@ class MultipartUploader:
 
     def _write_to_staging_buffer(self, chunk: bytes) -> None:
         self.staging_buffer.write(chunk)
-        if self.staging_buffer.tell() >= self.staging_buffer_size:
+        if self.staging_buffer.tell() >= self.part_size:
             self._flush_staging_buffer()
 
     def _flush_staging_buffer(self) -> None:
         if self.staging_buffer.tell() == 0:
             return
 
+        buffer_size = self.staging_buffer.tell()
         self.staging_buffer.seek(0)
-        staging_dir = next(self.staging_dirs)
-        with tempfile.NamedTemporaryFile(delete=False, dir=staging_dir) as tmp:
-            tmp.write(self.staging_buffer.read())
-            self.staging_files.append(tmp.name)
 
+        while buffer_size >= self.part_size:
+            staging_dir = next(self.staging_dirs)
+            with tempfile.NamedTemporaryFile(delete=False, dir=staging_dir) as tmp:
+                tmp.write(self.staging_buffer.read())
+                self.staging_files.append(tmp.name)
+                buffer_size -= self.part_size
+
+        # Move remaining data to a new buffer
+        remaining_data = self.staging_buffer.read()
         self.staging_buffer = io.BytesIO()
+        self.staging_buffer.write(remaining_data)
 
     def _upload_staged_files(self) -> None:
         self._flush_staging_buffer()
