@@ -50,33 +50,33 @@ response = Response(mock_resp)
     ("exception", "expected"),
     [
         (
-                TosServerError(
-                    response,
-                    "Exceed account external rate limit. Too much throughput in a "
-                    "short period of time, please slow down.",
-                    "ExceedAccountExternalRateLimit",
-                    "KmsJSKDKhjasdlKmsduwRETYHB",
-                    "",
-                    "0004-00000001",
-                ),
-                True,
+            TosServerError(
+                response,
+                "Exceed account external rate limit. Too much throughput in a "
+                "short period of time, please slow down.",
+                "ExceedAccountExternalRateLimit",
+                "KmsJSKDKhjasdlKmsduwRETYHB",
+                "",
+                "0004-00000001",
+            ),
+            True,
         ),
         (
-                TosClientError(
-                    "http request timeout",
-                    ConnectionError(
-                        ProtocolError(
-                            "Connection aborted.",
-                            ConnectionResetError(104, "Connection reset by peer"),
-                        )
-                    ),
+            TosClientError(
+                "http request timeout",
+                ConnectionError(
+                    ProtocolError(
+                        "Connection aborted.",
+                        ConnectionResetError(104, "Connection reset by peer"),
+                    )
                 ),
-                True,
+            ),
+            True,
         ),
     ],
 )
 def test_is_retry_exception(
-        exception,
-        expected,
+    exception,
+    expected,
 ):
     assert is_retryable_exception(exception) == expected
