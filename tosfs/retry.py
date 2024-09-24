@@ -33,14 +33,14 @@ from tos.exceptions import TosClientError, TosError, TosServerError
 
 from tosfs.exceptions import TosfsError
 
-CONFLICT_CODE = "409"
-TOO_MANY_REQUESTS_CODE = "429"
-SERVICE_UNAVAILABLE = "503"
+CONFLICT_CODE = 409
+TOO_MANY_REQUESTS_CODE = 429
+SERVICE_UNAVAILABLE = 503
 
 TOS_SERVER_RETRYABLE_STATUS_CODES = {
     CONFLICT_CODE,
     TOO_MANY_REQUESTS_CODE,
-    "500",  # INTERNAL_SERVER_ERROR,
+    500,  # INTERNAL_SERVER_ERROR,
     SERVICE_UNAVAILABLE,
 }
 
@@ -111,11 +111,16 @@ def retryable_func_executor(
                 except InterruptedError as ie:
                     raise TosfsError(f"Request {func} interrupted.") from ie
             else:
-                raise e
+                _rethrow_retryable_exception(e)
         # Note: maybe not all the retryable exceptions are warped by `TosError`
         # Will pay attention to those cases
         except Exception as e:
             raise TosfsError(f"{e}") from e
+
+
+def _rethrow_retryable_exception(e: TosError) -> None:
+    """For debug purpose."""
+    raise e
 
 
 def is_retryable_exception(e: TosError) -> bool:
