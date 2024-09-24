@@ -2107,15 +2107,18 @@ class TosFile(AbstractBufferedFile):
 
         def fetch() -> bytes:
             with io.BytesIO() as temp_buffer:
-                for chunk in self.fs.tos_client.get_object(
-                    self.bucket,
-                    self.key,
-                    self.version_id,
-                    range_start=start,
-                    range_end=end,
-                ):
-                    temp_buffer.write(chunk)
-                return temp_buffer.getvalue()
+                try:
+                    for chunk in self.fs.tos_client.get_object(
+                        self.bucket,
+                        self.key,
+                        self.version_id,
+                        range_start=start,
+                        range_end=end,
+                    ):
+                        temp_buffer.write(chunk)
+                    return temp_buffer.getvalue()
+                except Exception as e:
+                    raise TosClientError(f"{e}", e) from e
 
         return retryable_func_executor(fetch, max_retry_num=self.fs.max_retry_num)
 
