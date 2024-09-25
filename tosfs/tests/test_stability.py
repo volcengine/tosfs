@@ -25,7 +25,7 @@ def test_write_breakpoint_continuation(tosfs, bucket, temporary_workspace):
     with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "w") as f:
         f.write(first_part)
         # mock a very long block(business processing or network issue)
-        sleep(60)
+        sleep(60 * 15)
         f.write(second_part)
 
     assert tosfs.info(f"{bucket}/{temporary_workspace}/{file_name}")["size"] == len(
@@ -49,7 +49,7 @@ def test_read_breakpoint_continuation(tosfs, bucket, temporary_workspace):
         read_first_part = f.read(10 * 1024 * 1024)
         assert read_first_part == first_part
         # mock a very long block(business processing or network issue)
-        sleep(60)
+        sleep(60 * 15)
         read_second_part = f.read(10 * 1024 * 1024)
         assert read_second_part == second_part
         assert read_first_part + read_second_part == first_part + second_part

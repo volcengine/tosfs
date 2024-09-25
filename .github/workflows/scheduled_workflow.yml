@@ -16,7 +16,7 @@ name: Scheduled Workflow
 
 on:
   schedule:
-    # Runs every day at midnight
+    # Runs every day at midnight and noon (beijing time)
     - cron: '0 4,16 * * *'
 
 jobs:
@@ -50,5 +50,5 @@ jobs:
         echo "TOS_REGION=${{ vars.TOS_REGION }}" >> $GITHUB_ENV
         echo "TOS_ENDPOINT=${{ vars.TOS_ENDPOINT }}" >> $GITHUB_ENV
         echo "TOSFS_LOGGING_LEVEL=${{ vars.TOSFS_LOGGING_LEVEL }}" >> $GITHUB_ENV
-    - name: Run tests
-      run: make test
+    - name: Run stability tests
+      run: make test_stability
