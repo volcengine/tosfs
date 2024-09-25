@@ -1091,7 +1091,7 @@ class TosFileSystem(AbstractFileSystem):
                 "Can not specify 'prefix' option alongside 'maxdepth' options."
             )
         if maxdepth:
-            return super().find(
+            return self._fsspec_find(
                 bucket + "/" + key,
                 maxdepth=maxdepth,
                 withdirs=withdirs,
@@ -1105,6 +1105,54 @@ class TosFileSystem(AbstractFileSystem):
             return {o["name"]: o for o in out}
         else:
             return [o["name"] for o in out]
+
+    def _fsspec_find(  # noqa #
+        self,
+        path: str,
+        maxdepth: Optional[int] = None,
+        withdirs: bool = False,
+        detail: bool = False,
+        **kwargs: Any,  # type: ignore
+    ) -> Any:
+        """List all files below path.
+
+        Copied from fsspec(2024.9.0) to fix fsspec(2023.5.0.)
+
+        Like posix ``find`` command without conditions
+
+        Parameters
+        ----------
+        path : str
+        maxdepth: int or None
+            If not None, the maximum number of levels to descend
+        withdirs: bool
+            Whether to include directory paths in the output. This is True
+            when used by glob, but users usually only want files.
+        kwargs are passed to ``ls``.
+
+        """
+        # TODO: allow equivalent of -name parameter
+        path = self._strip_protocol(path)
+        out = {}
+
+        # Add the root directory if withdirs is requested
+        # This is needed for posix glob compliance
+        if withdirs and path != "" and self.isdir(path):
+            out[path] = self.info(path)
+
+        for _, dirs, files in self._fsspec_walk(path, maxdepth, detail=True, **kwargs):
+            if withdirs:
+                files.update(dirs)
+            out.update({info["name"]: info for name, info in files.items()})
+        if not out and self.isfile(path):
+            # walk works on directories, but find should also return [path]
+            # when path happens to be a file
+            out[path] = {}
+        names = sorted(out)
+        if not detail:
+            return names
+        else:
+            return {name: out[name] for name in names}
 
     def expand_path(
         self,
