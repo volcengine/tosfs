@@ -462,6 +462,11 @@ def test_find(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> No
     )
     assert result[f"{bucket}/{temporary_workspace}"]["type"] == "directory"
 
+    result = tosfs.find(
+        f"{bucket}/{temporary_workspace}/", withdirs=True, maxdepth=1, detail=True
+    )
+    assert len(result) == 1
+
     dir_name = random_str()
     sub_dir_name = random_str()
     file_name = random_str()
@@ -683,7 +688,9 @@ def test_rm(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None
         f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}/{sub_file_name}"
     )
     tosfs.rm(f"{bucket}/{temporary_workspace}/{dir_name}", recursive=True)
+    assert not tosfs.exists(f"{bucket}/{temporary_workspace}/{dir_name}/{sub_file_name}")
     assert not tosfs.exists(f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}")
+    assert not tosfs.exists(f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}/{sub_file_name}")
     assert not tosfs.exists(f"{bucket}/{temporary_workspace}/{dir_name}")
 
     # Test Deletion of Non-Existent Path

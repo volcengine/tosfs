@@ -1227,7 +1227,6 @@ class TosFileSystem(AbstractFileSystem):
                 return self.tos_client.list_objects_type2(
                     bucket,
                     prefix=key.rstrip("/") + "/",
-                    delimiter="/",
                     max_keys=LS_OPERATION_DEFAULT_MAX_ITEMS,
                     continuation_token=continuation_token,
                 )
@@ -1239,7 +1238,7 @@ class TosFileSystem(AbstractFileSystem):
             )
             is_truncated = resp.is_truncated
             continuation_token = resp.next_continuation_token
-            all_results.extend(resp.contents)
+            all_results = resp.contents
 
         deleting_objects = [
             DeletingObject(o.key if hasattr(o, "key") else o.prefix)
