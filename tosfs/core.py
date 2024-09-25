@@ -1837,7 +1837,16 @@ class TosFileSystem(AbstractFileSystem):
                     )
                 except TosServerError as ex:
                     if e.status_code == TOS_SERVER_STATUS_CODE_NOT_FOUND:
-                        return False
+                        resp = retryable_func_executor(
+                            lambda: self.tos_client.list_objects_type2(
+                                bucket,
+                                key.rstrip("/") + "/",
+                                start_after=key.rstrip("/") + "/",
+                                max_keys=1,
+                            ),
+                            max_retry_num=self.max_retry_num,
+                        )
+                        return len(resp.contents) > 0
                     else:
                         raise ex
             else:

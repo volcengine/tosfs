@@ -14,15 +14,12 @@
 import os.path
 import tempfile
 
-import fsspec
 import pytest
 from tos.exceptions import TosServerError
 
 from tosfs.core import TosFileSystem
 from tosfs.exceptions import TosfsError
 from tosfs.utils import create_temp_dir, random_str
-
-fsspec_version = fsspec.__version__
 
 
 def test_ls_bucket(tosfs: TosFileSystem, bucket: str) -> None:
@@ -225,6 +222,11 @@ def test_exists_object(
     assert not tosfs.exists(f"{bucket}/{temporary_workspace}/nonexistent")
     tosfs.rm_file(f"{bucket}/{temporary_workspace}/{file_name}")
     assert not tosfs.exists(f"{bucket}/{temporary_workspace}/{file_name}")
+
+    tosfs.touch(f"{bucket}/{temporary_workspace}/a/b/c/d.txt")
+    assert tosfs.exists(f"{bucket}/{temporary_workspace}/a")
+    assert tosfs.exists(f"{bucket}/{temporary_workspace}/a/b")
+    assert tosfs.exists(f"{bucket}/{temporary_workspace}/a/b/c")
 
 
 def test_mkdir(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
@@ -635,24 +637,15 @@ def test_glob(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> No
     )
 
     # Test with maxdepth
-    assert (
-        sorted(tosfs.glob(f"{bucket}/{temporary_workspace}/**", maxdepth=2))
-        == sorted(
-            [
-                f"{bucket}/{temporary_workspace}/{dir_name}",
-                f"{bucket}/{temporary_workspace}/{dir_name}/{file_name}",
-                f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}",
-            ]
-        )
-        if fsspec_version == "2023.5.0"
-        else sorted(
-            [
-                f"{bucket}/{temporary_workspace}",
-                f"{bucket}/{temporary_workspace}/{dir_name}",
-                f"{bucket}/{temporary_workspace}/{dir_name}/{file_name}",
-                f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}",
-            ]
-        )
+    assert sorted(
+        tosfs.glob(f"{bucket}/{temporary_workspace}/**", maxdepth=2)
+    ) == sorted(
+        [
+            f"{bucket}/{temporary_workspace}",
+            f"{bucket}/{temporary_workspace}/{dir_name}",
+            f"{bucket}/{temporary_workspace}/{dir_name}/{file_name}",
+            f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}",
+        ]
     )
 
     # Test with detail
