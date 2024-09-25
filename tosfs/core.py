@@ -950,6 +950,8 @@ class TosFileSystem(AbstractFileSystem):
     ) -> Any:
         """Return all files belows path.
 
+        Copied from fsspec(2024.9.0) to fix fsspec(2023.5.0.)
+
         List all files, recursing into subdirectories; output is iterator-style,
         like ``os.walk()``. For a simple list of files, ``find()`` is available.
 
