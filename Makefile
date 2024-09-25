@@ -1,6 +1,5 @@
 .ONESHELL:
 ENV_PREFIX=$(shell poetry env info -p 2>/dev/null)/bin/
-TEST_DIR?="tosfs/tests/"
 
 .PHONY: help
 help:             ## Show the help.
@@ -48,11 +47,11 @@ lint:             ## Run pep8, black, mypy linters.
 
 .PHONY: test
 test:             ## Run tests and generate coverage report.
-	$(ENV_PREFIX)pytest -vv -s --cov-config .coveragerc --cov=tosfs -l --tb=short --maxfail=1 ${TEST_DIR} --ignore=${TEST_DIR}/test_stability.py
+	$(ENV_PREFIX)pytest -vv -s --cov-config .coveragerc --cov=tosfs -l --tb=short --maxfail=1 tosfs/tests/ --ignore=tosfs/tests/test_stability.py
 
 .PHONY: test_stability
 test_stability:             ## Run stability tests.
-	$(ENV_PREFIX)pytest -vv -s --cov-config .coveragerc --cov=tosfs -l --tb=short --maxfail=1 ${TEST_DIR}/test_stability.py
+	$(ENV_PREFIX)pytest -vv -s --cov-config .coveragerc --cov=tosfs -l --tb=short --maxfail=1 tosfs/tests/test_stability.py
 
 .PHONY: watch
 watch:            ## Run tests on every change.

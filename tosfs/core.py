@@ -1239,7 +1239,7 @@ class TosFileSystem(AbstractFileSystem):
             )
             is_truncated = resp.is_truncated
             continuation_token = resp.next_continuation_token
-            all_results.extend(resp.contents + resp.common_prefixes)
+            all_results.extend(resp.contents)
 
         deleting_objects = [
             DeletingObject(o.key if hasattr(o, "key") else o.prefix)
