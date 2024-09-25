@@ -12,7 +12,8 @@ help:             ## Show the help.
 	@echo "install:          ## Install the project in dev mode."
 	@echo "fmt:              ## Format code using black & isort."
 	@echo "lint:             ## Run pep8, black, mypy linters."
-	@echo "test: lint        ## Run tests and generate coverage report."
+	@echo "test:	         ## Run tests and generate coverage report."
+	@echo "test_stability:	 ## Run stability tests."
 	@echo "watch:            ## Run tests on every change."
 	@echo "clean:            ## Clean unused files."
 	@echo "release:          ## Create a new tag for release."
@@ -47,7 +48,11 @@ lint:             ## Run pep8, black, mypy linters.
 
 .PHONY: test
 test:             ## Run tests and generate coverage report.
-	$(ENV_PREFIX)pytest -vv -s --cov-config .coveragerc --cov=tosfs -l --tb=short --maxfail=1 ${TEST_DIR}
+	$(ENV_PREFIX)pytest -vv -s --cov-config .coveragerc --cov=tosfs -l --tb=short --maxfail=1 ${TEST_DIR} --ignore=${TEST_DIR}/test_stability.py
+
+.PHONY: test_stability
+test_stability:             ## Run stability tests.
+	$(ENV_PREFIX)pytest -vv -s --cov-config .coveragerc --cov=tosfs -l --tb=short --maxfail=1 ${TEST_DIR}/test_stability.py
 
 .PHONY: watch
 watch:            ## Run tests on every change.
