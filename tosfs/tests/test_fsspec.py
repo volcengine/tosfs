@@ -14,6 +14,7 @@
 
 import io
 import os
+import tempfile
 from typing import Any
 
 import pytest
@@ -763,27 +764,44 @@ def test_get(fsspecfs: Any, bucket: str, temporary_workspace: str):
 
 
 def test_put(fsspecfs: Any, bucket: str, temporary_workspace: str):
-    file_name = random_str()
-    local_temp_dir = create_temp_dir()
-    local_file_path = f"{local_temp_dir}/{file_name}"
-    test_data = b"Data for testing ProtonFileSystem put method."
+    file_name = f"{random_str()}.txt"
+    with tempfile.TemporaryDirectory() as local_temp_dir:
+        local_file_path = f"{local_temp_dir}/{file_name}"
+        test_data = b"Data for testing ProtonFileSystem put method."
 
-    with open(local_file_path, "wb") as f:
-        f.write(test_data)
+        with open(local_file_path, "wb") as f:
+            f.write(test_data)
 
-    remote_file_path = f"{bucket}/{temporary_workspace}/{file_name}"
-    fsspecfs.put(local_file_path, remote_file_path)
+        remote_file_path = f"{bucket}/{temporary_workspace}/{file_name}"
+        fsspecfs.put(local_file_path, remote_file_path)
 
-    assert fsspecfs.exists(
-        remote_file_path
-    ), "The file should exist in the remote location after upload."
+        assert fsspecfs.exists(
+            remote_file_path
+        ), "The file should exist in the remote location after upload."
 
-    downloaded_file_path = f"{local_temp_dir}/downloaded_{file_name}"
-    fsspecfs.get(remote_file_path, downloaded_file_path)
-    with open(downloaded_file_path, "rb") as f:
-        downloaded_data = f.read()
-        assert (
-            downloaded_data == test_data
-        ), "The downloaded file's contents should match the original test data."
-    os.remove(downloaded_file_path)
-    os.remove(local_file_path)
+        downloaded_file_path = f"{local_temp_dir}/downloaded_{file_name}"
+        fsspecfs.get(remote_file_path, downloaded_file_path)
+        with open(downloaded_file_path, "rb") as f:
+            downloaded_data = f.read()
+            assert (
+                downloaded_data == test_data
+            ), "The downloaded file's contents should match the original test data."
+
+        # test lpath and rpath are both dirs
+        remote_temp_dir = f"{bucket}/{temporary_workspace}/{random_str()}"
+
+        fsspecfs.mkdir(remote_temp_dir)
+        fsspecfs.put(local_temp_dir, remote_temp_dir, recursive=True)
+        assert fsspecfs.exists(remote_temp_dir), "The remote directory should exist."
+        remote_file_path = os.path.join(
+            remote_temp_dir, os.path.basename(local_temp_dir), file_name
+        )
+        assert fsspecfs.exists(
+            remote_file_path
+        ), "The remote directory should contain the local directory."
+
+        with fsspecfs.open(remote_file_path, "rb") as f:
+            downloaded_data = f.read()
+            assert (
+                downloaded_data == test_data
+            ), "The downloaded file's contents should match the original test data."

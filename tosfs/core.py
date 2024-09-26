@@ -779,8 +779,6 @@ class TosFileSystem(AbstractFileSystem):
         ------
         FileNotFoundError
             If the local file does not exist.
-        IsADirectoryError
-            If the local path is a directory.
         TosClientError
             If there is a client error while putting the file.
         TosServerError
@@ -798,7 +796,8 @@ class TosFileSystem(AbstractFileSystem):
             raise FileNotFoundError(f"Local file {lpath} not found.")
 
         if os.path.isdir(lpath):
-            raise IsADirectoryError(f"{lpath} is a directory.")
+            self.makedirs(rpath, exist_ok=True)
+            return
 
         size = os.path.getsize(lpath)
 
@@ -811,6 +810,7 @@ class TosFileSystem(AbstractFileSystem):
 
         if self.isdir(rpath):
             rpath = os.path.join(rpath, os.path.basename(lpath))
+            self.mkdirs(self._parent(rpath), exist_ok=True)
 
         bucket, key, _ = self._split_path(rpath)
 
