@@ -39,6 +39,7 @@ from tos.models2 import (
 
 from tosfs.consts import (
     APPEND_OPERATION_SMALL_FILE_THRESHOLD,
+    ENV_NAME_TOS_SDK_LOGGING_LEVEL,
     ENV_NAME_TOSFS_LOGGING_LEVEL,
     FILE_OPERATION_READ_WRITE_BUFFER_SIZE,
     GET_OBJECT_OPERATION_DEFAULT_READ_CHUNK_SIZE,
@@ -75,7 +76,7 @@ def setup_logging() -> None:
     # set and config tos client's logger
     tos.set_logger(
         name="tosclient",
-        level=os.environ.get(ENV_NAME_TOSFS_LOGGING_LEVEL, "INFO"),
+        level=os.environ.get(ENV_NAME_TOS_SDK_LOGGING_LEVEL, "WARNING"),
         log_handler=logging.StreamHandler(),
         format_string=TOSFS_LOG_FORMAT,
     )
