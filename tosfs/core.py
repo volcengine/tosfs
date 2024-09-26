@@ -532,7 +532,7 @@ class TosFileSystem(AbstractFileSystem):
                         lambda: self.tos_client.head_object(
                             bucket, key.rstrip("/") + "/"
                         )
-                                or True,
+                        or True,
                         max_retry_num=self.max_retry_num,
                     )
                 except TosServerError as ex:
@@ -543,7 +543,7 @@ class TosFileSystem(AbstractFileSystem):
                                 key.rstrip("/") + "/",
                                 start_after=key.rstrip("/") + "/",
                                 max_keys=1,
-                                ),
+                            ),
                             max_retry_num=self.max_retry_num,
                         )
                         return len(resp.contents) > 0
@@ -590,10 +590,7 @@ class TosFileSystem(AbstractFileSystem):
         if not self.isdir(path):
             raise NotADirectoryError(f"{path} is not a directory.")
 
-        if (
-            len(self._ls_objects(bucket, max_items=1, prefix=key.rstrip("/") + "/"))
-            > 0
-        ):
+        if len(self._ls_objects(bucket, max_items=1, prefix=key.rstrip("/") + "/")) > 0:
             raise TosfsError(f"Directory {path} is not empty.")
 
         retryable_func_executor(
@@ -1024,7 +1021,6 @@ class TosFileSystem(AbstractFileSystem):
             path, maxdepth=maxdepth, topdown=topdown, on_error=on_error, **kwargs
         )
 
-
     def find(
         self,
         path: str,
@@ -1083,7 +1079,6 @@ class TosFileSystem(AbstractFileSystem):
             return {o["name"]: o for o in out}
         else:
             return [o["name"] for o in out]
-
 
     def expand_path(
         self,
@@ -1312,7 +1307,7 @@ class TosFileSystem(AbstractFileSystem):
         except Exception as e:
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
 
-########################  private methods  ########################
+    ########################  private methods  ########################
 
     def _list_and_batch_delete_objs(self, bucket: str, key: str) -> None:
         is_truncated = True
@@ -2012,15 +2007,15 @@ class TosFileSystem(AbstractFileSystem):
             "name": bucket_name,
         }
 
-###### fsspec's api implements (for old version compatibility) ######
+    ###### fsspec's api implements (for old version compatibility) ######
 
     def _fsspec_walk(  # noqa
-            self,
-            path: str,
-            maxdepth: Optional[int] = None,
-            topdown: bool = True,
-            on_error: str = "omit",
-            **kwargs: Any,
+        self,
+        path: str,
+        maxdepth: Optional[int] = None,
+        topdown: bool = True,
+        on_error: str = "omit",
+        **kwargs: Any,
     ) -> Any:
         """Return all files belows path.
 
@@ -2122,12 +2117,12 @@ class TosFileSystem(AbstractFileSystem):
             yield path, dirs, files
 
     def _fsspec_find(  # noqa #
-            self,
-            path: str,
-            maxdepth: Optional[int] = None,
-            withdirs: bool = False,
-            detail: bool = False,
-            **kwargs: Any,  # type: ignore
+        self,
+        path: str,
+        maxdepth: Optional[int] = None,
+        withdirs: bool = False,
+        detail: bool = False,
+        **kwargs: Any,  # type: ignore
     ) -> Any:
         """List all files below path.
 
