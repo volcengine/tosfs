@@ -89,7 +89,6 @@ The tosfs package is compatible with the following Python and fsspec versions:
 | 3.11    | ✅         |
 | 3.12    | ✅         |
 
-
 * fsspec
 
 | Version          | Supported |
