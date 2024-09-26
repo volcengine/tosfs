@@ -1374,6 +1374,17 @@ class TosFileSystem(AbstractFileSystem):
                 self.key = key
                 self.version_id = version_id
 
+        def delete_objects(deleting_objects: List[DeletingObject]) -> None:
+            delete_resp = retryable_func_executor(
+                lambda: self.tos_client.delete_multi_objects(
+                    bucket, deleting_objects, quiet=True
+                ),
+                max_retry_num=self.max_retry_num,
+            )
+            if delete_resp.error:
+                for d in delete_resp.error:
+                    logger.warning("Deleted object: %s failed", d)
+
         while is_truncated:
 
             def _call_list_objects_type2(
@@ -1395,21 +1406,13 @@ class TosFileSystem(AbstractFileSystem):
             continuation_token = resp.next_continuation_token
             all_results = resp.contents
 
-        deleting_objects = [
-            DeletingObject(o.key if hasattr(o, "key") else o.prefix)
-            for o in all_results
-        ]
+            deleting_objects = [
+                DeletingObject(o.key if hasattr(o, "key") else o.prefix)
+                for o in all_results
+            ]
 
-        if deleting_objects:
-            delete_resp = retryable_func_executor(
-                lambda: self.tos_client.delete_multi_objects(
-                    bucket, deleting_objects, quiet=True
-                ),
-                max_retry_num=self.max_retry_num,
-            )
-            if delete_resp.error:
-                for d in delete_resp.error:
-                    logger.warning("Deleted object: %s failed", d)
+            if deleting_objects:
+                delete_objects(deleting_objects)
 
     def _copy_basic(self, path1: str, path2: str, **kwargs: Any) -> None:
         """Copy file between locations on tos.
