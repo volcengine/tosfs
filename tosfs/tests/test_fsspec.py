@@ -423,8 +423,8 @@ def test_find(fsspecfs: Any, bucket: str, temporary_workspace: str):
     def remove_last_modification_time_ms(data):
         if isinstance(data, dict):
             for key in data:
-                if "last_modification_time_ms" in data[key]:
-                    del data[key]["last_modification_time_ms"]
+                if "LastModified" in data[key]:
+                    del data[key]["LastModified"]
         return data
 
     file1_path = f"{bucket}/{temporary_workspace}/file1"
