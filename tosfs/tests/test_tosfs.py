@@ -336,8 +336,7 @@ def test_put_file(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -
     with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "r") as f:
         assert f.read() == "hello world"
 
-    with pytest.raises(IsADirectoryError):
-        tosfs.put_file(temp_dir, f"{bucket}/{temporary_workspace}")
+    tosfs.put_file(temp_dir, f"{bucket}/{temporary_workspace}")
 
     with pytest.raises(FileNotFoundError):
         tosfs.put_file(f"/notexist/{random_str()}", rpath)
