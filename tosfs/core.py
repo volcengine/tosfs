@@ -96,7 +96,7 @@ class TosFileSystem(AbstractFileSystem):
     abstract super-class for pythonic file-systems.
     """
 
-    protocol = ("tos", "tosfs")
+    protocol = ("tos",)
 
     def __init__(
         self,
@@ -337,13 +337,13 @@ class TosFileSystem(AbstractFileSystem):
         """
         path = self._strip_protocol(path).rstrip("/")
         if path in ["", "/"]:
-            files = self._lsbuckets()
+            files = self._ls_buckets()
             return files if detail else sorted([o["name"] for o in files])
 
-        files = self._lsdir(path, versions=versions)
+        files = self._ls_dirs_and_files(path, versions=versions)
         if not files and "/" in path:
             try:
-                files = self._lsdir(self._parent(path), versions=versions)
+                files = self._ls_dirs_and_files(self._parent(path), versions=versions)
             except IOError:
                 pass
             files = [
@@ -477,6 +477,83 @@ class TosFileSystem(AbstractFileSystem):
 
         return self._try_dir_info(bucket, key, path, fullpath)
 
+    def exists(self, path: str, **kwargs: Any) -> bool:
+        """Check if a path exists in the TOS.
+
+        Parameters
+        ----------
+        path : str
+            The path to check for existence.
+        **kwargs : Any, optional
+            Additional arguments if needed in the future.
+
+        Returns
+        -------
+        bool
+            True if the path exists, False otherwise.
+
+        Raises
+        ------
+        tos.exceptions.TosClientError
+            If there is a client error while checking the path.
+        tos.exceptions.TosServerError
+            If there is a server error while checking the path.
+        TosfsError
+            If there is an unknown error while checking the path.
+
+        Examples
+        --------
+        >>> fs = TosFileSystem()
+        >>> fs.exists("tos://bucket/to/file")
+        True
+        >>> fs.exists("tos://mybucket/nonexistentfile")
+        False
+
+        """
+        if path in ["", "/"]:
+            # the root always exists
+            return True
+
+        path = self._strip_protocol(path)
+        bucket, key, version_id = self._split_path(path)
+        # if the path is a bucket
+        if not key:
+            return self._exists_bucket(bucket)
+
+        try:
+            return retryable_func_executor(
+                lambda: self.tos_client.head_object(bucket, key) or True,
+                max_retry_num=self.max_retry_num,
+            )
+        except TosServerError as e:
+            if e.status_code == TOS_SERVER_STATUS_CODE_NOT_FOUND:
+                try:
+                    return retryable_func_executor(
+                        lambda: self.tos_client.head_object(
+                            bucket, key.rstrip("/") + "/"
+                        )
+                                or True,
+                        max_retry_num=self.max_retry_num,
+                    )
+                except TosServerError as ex:
+                    if e.status_code == TOS_SERVER_STATUS_CODE_NOT_FOUND:
+                        resp = retryable_func_executor(
+                            lambda: self.tos_client.list_objects_type2(
+                                bucket,
+                                key.rstrip("/") + "/",
+                                start_after=key.rstrip("/") + "/",
+                                max_keys=1,
+                                ),
+                            max_retry_num=self.max_retry_num,
+                        )
+                        return len(resp.contents) > 0
+                    else:
+                        raise ex
+            else:
+                raise e
+        except Exception as ex:
+            raise TosfsError(f"Tosfs failed with unknown error: {ex}") from ex
+
     def rmdir(self, path: str) -> None:
         """Remove a directory if it is empty.
 
@@ -514,7 +591,7 @@ class TosFileSystem(AbstractFileSystem):
             raise NotADirectoryError(f"{path} is not a directory.")
 
         if (
-            len(self._listobjects(bucket, max_items=1, prefix=key.rstrip("/") + "/"))
+            len(self._ls_objects(bucket, max_items=1, prefix=key.rstrip("/") + "/"))
             > 0
         ):
             raise TosfsError(f"Directory {path} is not empty.")
@@ -557,7 +634,7 @@ class TosFileSystem(AbstractFileSystem):
                 self.rm_file(path)
             else:
                 try:
-                    self._list_and_batch_delete_objects(bucket, key)
+                    self._list_and_batch_delete_objs(bucket, key)
                 except (TosClientError, TosServerError) as e:
                     raise e
                 except Exception as e:
@@ -947,112 +1024,6 @@ class TosFileSystem(AbstractFileSystem):
             path, maxdepth=maxdepth, topdown=topdown, on_error=on_error, **kwargs
         )
 
-    def _fsspec_walk(  # noqa
-        self,
-        path: str,
-        maxdepth: Optional[int] = None,
-        topdown: bool = True,
-        on_error: str = "omit",
-        **kwargs: Any,
-    ) -> Any:
-        """Return all files belows path.
-
-        Copied from fsspec(2024.9.0) to fix fsspec(2023.5.0.)
-
-        List all files, recursing into subdirectories; output is iterator-style,
-        like ``os.walk()``. For a simple list of files, ``find()`` is available.
-
-        When topdown is True, the caller can modify the dirnames list in-place (perhaps
-        using del or slice assignment), and walk() will
-        only recurse into the subdirectories whose names remain in dirnames;
-        this can be used to prune the search, impose a specific order of visiting,
-        or even to inform walk() about directories the caller creates or renames before
-        it resumes walk() again.
-        Modifying dirnames when topdown is False has no effect. (see os.walk)
-
-        Note that the "files" outputted will include anything that is not
-        a directory, such as links.
-
-        Parameters
-        ----------
-        path: str
-            Root to recurse into
-        maxdepth: int
-            Maximum recursion depth. None means limitless, but not recommended
-            on link-based file-systems.
-        topdown: bool (True)
-            Whether to walk the directory tree from the top downwards or from
-            the bottom upwards.
-        on_error: "omit", "raise", a collable
-            if omit (default), path with exception will simply be empty;
-            If raise, an underlying exception will be raised;
-            if callable, it will be called with a single OSError instance as argument
-        kwargs: passed to ``ls``
-
-        """
-        # type: ignore
-        if maxdepth is not None and maxdepth < 1:
-            raise ValueError("maxdepth must be at least 1")
-
-        path = self._strip_protocol(path)
-        full_dirs = {}
-        dirs = {}
-        files = {}
-
-        detail = kwargs.pop("detail", False)
-        try:
-            listing = self.ls(path, detail=True, **kwargs)
-        except (FileNotFoundError, OSError) as e:
-            if on_error == "raise":
-                raise
-            elif callable(on_error):
-                on_error(e)
-            if detail:
-                return path, {}, {}  # type: ignore
-            return path, [], []  # type: ignore
-
-        for info in listing:
-            # each info name must be at least [path]/part , but here
-            # we check also for names like [path]/part/
-            pathname = info["name"].rstrip("/")  # type: ignore
-            name = pathname.rsplit("/", 1)[-1]
-            if info["type"] == "directory" and pathname != path:  # type: ignore
-                # do not include "self" path
-                full_dirs[name] = pathname
-                dirs[name] = info
-            elif pathname == path:
-                # file-like with same name as give path
-                files[""] = info
-            else:
-                files[name] = info
-
-        if not detail:
-            dirs = list(dirs)  # type: ignore
-            files = list(files)  # type: ignore
-
-        if topdown:
-            # Yield before recursion if walking top down
-            yield path, dirs, files
-
-        if maxdepth is not None:
-            maxdepth -= 1
-            if maxdepth < 1:
-                if not topdown:
-                    yield path, dirs, files
-                return
-
-        for d in dirs:
-            yield from self.walk(
-                full_dirs[d],
-                maxdepth=maxdepth,
-                detail=detail,
-                topdown=topdown,
-                **kwargs,
-            )
-
-        if not topdown:
-            # Yield after recursion if walking bottom up
-            yield path, dirs, files
 
     def find(
         self,
@@ -1113,53 +1084,6 @@ class TosFileSystem(AbstractFileSystem):
         else:
             return [o["name"] for o in out]
 
-    def _fsspec_find(  # noqa #
-        self,
-        path: str,
-        maxdepth: Optional[int] = None,
-        withdirs: bool = False,
-        detail: bool = False,
-        **kwargs: Any,  # type: ignore
-    ) -> Any:
-        """List all files below path.
-
-        Copied from fsspec(2024.9.0) to fix fsspec(2023.5.0.)
-
-        Like posix ``find`` command without conditions
-
-        Parameters
-        ----------
-        path : str
-        maxdepth: int or None
-            If not None, the maximum number of levels to descend
-        withdirs: bool
-            Whether to include directory paths in the output. This is True
-            when used by glob, but users usually only want files.
-        kwargs are passed to ``ls``.
-
-        """
-        # TODO: allow equivalent of -name parameter
-        path = self._strip_protocol(path)
-        out = {}
-
-        # Add the root directory if withdirs is requested
-        # This is needed for posix glob compliance
-        if withdirs and path != "" and self.isdir(path):
-            out[path] = self.info(path)
-
-        for _, dirs, files in self._fsspec_walk(path, maxdepth, detail=True, **kwargs):
-            if withdirs:
-                files.update(dirs)
-            out.update({info["name"]: info for name, info in files.items()})
-        if not out and self.isfile(path):
-            # walk works on directories, but find should also return [path]
-            # when path happens to be a file
-            out[path] = {}
-        names = sorted(out)
-        if not detail:
-            return names
-        else:
-            return {name: out[name] for name in names}
 
     def expand_path(
         self,
@@ -1371,7 +1295,26 @@ class TosFileSystem(AbstractFileSystem):
 
         return out if detail else list(out)
 
-    def _list_and_batch_delete_objects(self, bucket: str, key: str) -> None:
+    def _rm(self, path: str) -> None:
+        logger.info("Removing path: %s", path)
+        bucket, key, _ = self._split_path(path)
+
+        if path.endswith("/") or self.isdir(path):
+            key = key.rstrip("/") + "/"
+
+        try:
+            retryable_func_executor(
+                lambda: self.tos_client.delete_object(bucket, key),
+                max_retry_num=self.max_retry_num,
+            )
+        except (TosClientError, TosServerError) as e:
+            raise e
+        except Exception as e:
+            raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
+
+########################  private methods  ########################
+
+    def _list_and_batch_delete_objs(self, bucket: str, key: str) -> None:
         is_truncated = True
         continuation_token = ""
         all_results = []
@@ -1598,7 +1541,7 @@ class TosFileSystem(AbstractFileSystem):
     def _find_file_dir(
         self, key: str, path: str, prefix: str, withdirs: bool, kwargs: Any
     ) -> List[dict]:
-        out = self._lsdir(
+        out = self._ls_dirs_and_files(
             path, delimiter="", include_self=True, prefix=prefix, **kwargs
         )
         if not out and key:
@@ -1787,83 +1730,6 @@ class TosFileSystem(AbstractFileSystem):
         except Exception as e:
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
 
-    def exists(self, path: str, **kwargs: Any) -> bool:
-        """Check if a path exists in the TOS.
-
-        Parameters
-        ----------
-        path : str
-            The path to check for existence.
-        **kwargs : Any, optional
-            Additional arguments if needed in the future.
-
-        Returns
-        -------
-        bool
-            True if the path exists, False otherwise.
-
-        Raises
-        ------
-        tos.exceptions.TosClientError
-            If there is a client error while checking the path.
-        tos.exceptions.TosServerError
-            If there is a server error while checking the path.
-        TosfsError
-            If there is an unknown error while checking the path.
-
-        Examples
-        --------
-        >>> fs = TosFileSystem()
-        >>> fs.exists("tos://bucket/to/file")
-        True
-        >>> fs.exists("tos://mybucket/nonexistentfile")
-        False
-
-        """
-        if path in ["", "/"]:
-            # the root always exists
-            return True
-
-        path = self._strip_protocol(path)
-        bucket, key, version_id = self._split_path(path)
-        # if the path is a bucket
-        if not key:
-            return self._exists_bucket(bucket)
-
-        try:
-            return retryable_func_executor(
-                lambda: self.tos_client.head_object(bucket, key) or True,
-                max_retry_num=self.max_retry_num,
-            )
-        except TosServerError as e:
-            if e.status_code == TOS_SERVER_STATUS_CODE_NOT_FOUND:
-                try:
-                    return retryable_func_executor(
-                        lambda: self.tos_client.head_object(
-                            bucket, key.rstrip("/") + "/"
-                        )
-                        or True,
-                        max_retry_num=self.max_retry_num,
-                    )
-                except TosServerError as ex:
-                    if e.status_code == TOS_SERVER_STATUS_CODE_NOT_FOUND:
-                        resp = retryable_func_executor(
-                            lambda: self.tos_client.list_objects_type2(
-                                bucket,
-                                key.rstrip("/") + "/",
-                                start_after=key.rstrip("/") + "/",
-                                max_keys=1,
-                            ),
-                            max_retry_num=self.max_retry_num,
-                        )
-                        return len(resp.contents) > 0
-                    else:
-                        raise ex
-            else:
-                raise e
-        except Exception as ex:
-            raise TosfsError(f"Tosfs failed with unknown error: {ex}") from ex
-
     def _exists_bucket(self, bucket: str) -> bool:
         """Check if a bucket exists in the TOS.
 
@@ -1911,7 +1777,7 @@ class TosFileSystem(AbstractFileSystem):
         except Exception as e:
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
 
-    def _lsbuckets(self) -> List[dict]:
+    def _ls_buckets(self) -> List[dict]:
         """List all buckets in the account.
 
         Returns
@@ -1947,7 +1813,7 @@ class TosFileSystem(AbstractFileSystem):
 
         return [self._fill_bucket_info(bucket.name) for bucket in resp.buckets]
 
-    def _lsdir(
+    def _ls_dirs_and_files(
         self,
         path: str,
         max_items: int = LS_OPERATION_DEFAULT_MAX_ITEMS,
@@ -1965,7 +1831,7 @@ class TosFileSystem(AbstractFileSystem):
         logger.debug("Get directory listing for %s", path)
         dirs = []
         files = []
-        for obj in self._listobjects(
+        for obj in self._ls_objects(
             bucket,
             max_items=max_items,
             delimiter=delimiter,
@@ -1983,7 +1849,7 @@ class TosFileSystem(AbstractFileSystem):
 
         return files
 
-    def _listobjects(
+    def _ls_objects(
         self,
         bucket: str,
         max_items: int = LS_OPERATION_DEFAULT_MAX_ITEMS,
@@ -2058,23 +1924,6 @@ class TosFileSystem(AbstractFileSystem):
                 all_results.extend(resp.contents + resp.common_prefixes)
 
         return all_results
-
-    def _rm(self, path: str) -> None:
-        logger.info("Removing path: %s", path)
-        bucket, key, _ = self._split_path(path)
-
-        if path.endswith("/") or self.isdir(path):
-            key = key.rstrip("/") + "/"
-
-        try:
-            retryable_func_executor(
-                lambda: self.tos_client.delete_object(bucket, key),
-                max_retry_num=self.max_retry_num,
-            )
-        except (TosClientError, TosServerError) as e:
-            raise e
-        except Exception as e:
-            raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
 
     def _split_path(self, path: str) -> Tuple[str, str, Optional[str]]:
         """Normalise tos path string into bucket and key.
@@ -2162,6 +2011,163 @@ class TosFileSystem(AbstractFileSystem):
             "type": "directory",
             "name": bucket_name,
         }
+
+###### fsspec's api implements (for old version compatibility) ######
+
+    def _fsspec_walk(  # noqa
+            self,
+            path: str,
+            maxdepth: Optional[int] = None,
+            topdown: bool = True,
+            on_error: str = "omit",
+            **kwargs: Any,
+    ) -> Any:
+        """Return all files belows path.
+
+        Copied from fsspec(2024.9.0) to fix fsspec(2023.5.0.)
+
+        List all files, recursing into subdirectories; output is iterator-style,
+        like ``os.walk()``. For a simple list of files, ``find()`` is available.
+
+        When topdown is True, the caller can modify the dirnames list in-place (perhaps
+        using del or slice assignment), and walk() will
+        only recurse into the subdirectories whose names remain in dirnames;
+        this can be used to prune the search, impose a specific order of visiting,
+        or even to inform walk() about directories the caller creates or renames before
+        it resumes walk() again.
+        Modifying dirnames when topdown is False has no effect. (see os.walk)
+
+        Note that the "files" outputted will include anything that is not
+        a directory, such as links.
+
+        Parameters
+        ----------
+        path: str
+            Root to recurse into
+        maxdepth: int
+            Maximum recursion depth. None means limitless, but not recommended
+            on link-based file-systems.
+        topdown: bool (True)
+            Whether to walk the directory tree from the top downwards or from
+            the bottom upwards.
+        on_error: "omit", "raise", a collable
+            if omit (default), path with exception will simply be empty;
+            If raise, an underlying exception will be raised;
+            if callable, it will be called with a single OSError instance as argument
+        kwargs: passed to ``ls``
+
+        """
+        # type: ignore
+        if maxdepth is not None and maxdepth < 1:
+            raise ValueError("maxdepth must be at least 1")
+
+        path = self._strip_protocol(path)
+        full_dirs = {}
+        dirs = {}
+        files = {}
+
+        detail = kwargs.pop("detail", False)
+        try:
+            listing = self.ls(path, detail=True, **kwargs)
+        except (FileNotFoundError, OSError) as e:
+            if on_error == "raise":
+                raise
+            elif callable(on_error):
+                on_error(e)
+            if detail:
+                return path, {}, {}  # type: ignore
+            return path, [], []  # type: ignore
+
+        for info in listing:
+            # each info name must be at least [path]/part , but here
+            # we check also for names like [path]/part/
+            pathname = info["name"].rstrip("/")  # type: ignore
+            name = pathname.rsplit("/", 1)[-1]
+            if info["type"] == "directory" and pathname != path:  # type: ignore
+                # do not include "self" path
+                full_dirs[name] = pathname
+                dirs[name] = info
+            elif pathname == path:
+                # file-like with same name as give path
+                files[""] = info
+            else:
+                files[name] = info
+
+        if not detail:
+            dirs = list(dirs)  # type: ignore
+            files = list(files)  # type: ignore
+
+        if topdown:
+            # Yield before recursion if walking top down
+            yield path, dirs, files
+
+        if maxdepth is not None:
+            maxdepth -= 1
+            if maxdepth < 1:
+                if not topdown:
+                    yield path, dirs, files
+                return
+
+        for d in dirs:
+            yield from self.walk(
+                full_dirs[d],
+                maxdepth=maxdepth,
+                detail=detail,
+                topdown=topdown,
+                **kwargs,
+            )
+
+        if not topdown:
+            # Yield after recursion if walking bottom up
+            yield path, dirs, files
+
+    def _fsspec_find(  # noqa #
+            self,
+            path: str,
+            maxdepth: Optional[int] = None,
+            withdirs: bool = False,
+            detail: bool = False,
+            **kwargs: Any,  # type: ignore
+    ) -> Any:
+        """List all files below path.
+
+        Copied from fsspec(2024.9.0) to fix fsspec(2023.5.0.)
+
+        Like posix ``find`` command without conditions
+
+        Parameters
+        ----------
+        path : str
+        maxdepth: int or None
+            If not None, the maximum number of levels to descend
+        withdirs: bool
+            Whether to include directory paths in the output. This is True
+            when used by glob, but users usually only want files.
+        kwargs are passed to ``ls``.
+
+        """
+        # TODO: allow equivalent of -name parameter
+        path = self._strip_protocol(path)
+        out = {}
+
+        # Add the root directory if withdirs is requested
+        # This is needed for posix glob compliance
+        if withdirs and path != "" and self.isdir(path):
+            out[path] = self.info(path)
+
+        for _, dirs, files in self._fsspec_walk(path, maxdepth, detail=True, **kwargs):
+            if withdirs:
+                files.update(dirs)
+            out.update({info["name"]: info for name, info in files.items()})
+        if not out and self.isfile(path):
+            # walk works on directories, but find should also return [path]
+            # when path happens to be a file
+            out[path] = {}
+        names = sorted(out)
+        if not detail:
+            return names
+        else:
+            return {name: out[name] for name in names}
 
 
 class TosFile(AbstractBufferedFile):
