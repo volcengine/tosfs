@@ -8,7 +8,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.9"
-fsspec = ">=2023.5.0"
+fsspec = "==2023.5.0"
 tos = ">=2.7.0"
 
 [tool.poetry.group.dev.dependencies]

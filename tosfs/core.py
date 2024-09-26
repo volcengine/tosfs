@@ -936,9 +936,116 @@ class TosFileSystem(AbstractFileSystem):
         if path in ["", "*"] + ["{}://".format(p) for p in self.protocol]:
             raise ValueError("Cannot access all of TOS via path {}.".format(path))
 
-        return super().walk(
+        return self._fsspec_walk(
             path, maxdepth=maxdepth, topdown=topdown, on_error=on_error, **kwargs
         )
+
+    def _fsspec_walk(  # noqa
+        self,
+        path: str,
+        maxdepth: Optional[int] = None,
+        topdown: bool = True,
+        on_error: str = "omit",
+        **kwargs: Any,
+    ) -> Any:
+        """Return all files belows path.
+
+        Copied from fsspec(2024.9.0) to fix fsspec(2023.5.0.)
+
+        List all files, recursing into subdirectories; output is iterator-style,
+        like ``os.walk()``. For a simple list of files, ``find()`` is available.
+
+        When topdown is True, the caller can modify the dirnames list in-place (perhaps
+        using del or slice assignment), and walk() will
+        only recurse into the subdirectories whose names remain in dirnames;
+        this can be used to prune the search, impose a specific order of visiting,
+        or even to inform walk() about directories the caller creates or renames before
+        it resumes walk() again.
+        Modifying dirnames when topdown is False has no effect. (see os.walk)
+
+        Note that the "files" outputted will include anything that is not
+        a directory, such as links.
+
+        Parameters
+        ----------
+        path: str
+            Root to recurse into
+        maxdepth: int
+            Maximum recursion depth. None means limitless, but not recommended
+            on link-based file-systems.
+        topdown: bool (True)
+            Whether to walk the directory tree from the top downwards or from
+            the bottom upwards.
+        on_error: "omit", "raise", a collable
+            if omit (default), path with exception will simply be empty;
+            If raise, an underlying exception will be raised;
+            if callable, it will be called with a single OSError instance as argument
+        kwargs: passed to ``ls``
+
+        """
+        # type: ignore
+        if maxdepth is not None and maxdepth < 1:
+            raise ValueError("maxdepth must be at least 1")
+
+        path = self._strip_protocol(path)
+        full_dirs = {}
+        dirs = {}
+        files = {}
+
+        detail = kwargs.pop("detail", False)
+        try:
+            listing = self.ls(path, detail=True, **kwargs)
+        except (FileNotFoundError, OSError) as e:
+            if on_error == "raise":
+                raise
+            elif callable(on_error):
+                on_error(e)
+            if detail:
+                return path, {}, {}  # type: ignore
+            return path, [], []  # type: ignore
+
+        for info in listing:
+            # each info name must be at least [path]/part , but here
+            # we check also for names like [path]/part/
+            pathname = info["name"].rstrip("/")  # type: ignore
+            name = pathname.rsplit("/", 1)[-1]
+            if info["type"] == "directory" and pathname != path:  # type: ignore
+                # do not include "self" path
+                full_dirs[name] = pathname
+                dirs[name] = info
+            elif pathname == path:
+                # file-like with same name as give path
+                files[""] = info
+            else:
+                files[name] = info
+
+        if not detail:
+            dirs = list(dirs)  # type: ignore
+            files = list(files)  # type: ignore
+
+        if topdown:
+            # Yield before recursion if walking top down
+            yield path, dirs, files
+
+        if maxdepth is not None:
+            maxdepth -= 1
+            if maxdepth < 1:
+                if not topdown:
+                    yield path, dirs, files
+                return
+
+        for d in dirs:
+            yield from self.walk(
+                full_dirs[d],
+                maxdepth=maxdepth,
+                detail=detail,
+                topdown=topdown,
+                **kwargs,
+            )
+
+        if not topdown:
+            # Yield after recursion if walking bottom up
+            yield path, dirs, files
 
     def find(
         self,
@@ -984,7 +1091,7 @@ class TosFileSystem(AbstractFileSystem):
                 "Can not specify 'prefix' option alongside 'maxdepth' options."
             )
         if maxdepth:
-            return super().find(
+            return self._fsspec_find(
                 bucket + "/" + key,
                 maxdepth=maxdepth,
                 withdirs=withdirs,
@@ -998,6 +1105,54 @@ class TosFileSystem(AbstractFileSystem):
             return {o["name"]: o for o in out}
         else:
             return [o["name"] for o in out]
+
+    def _fsspec_find(  # noqa #
+        self,
+        path: str,
+        maxdepth: Optional[int] = None,
+        withdirs: bool = False,
+        detail: bool = False,
+        **kwargs: Any,  # type: ignore
+    ) -> Any:
+        """List all files below path.
+
+        Copied from fsspec(2024.9.0) to fix fsspec(2023.5.0.)
+
+        Like posix ``find`` command without conditions
+
+        Parameters
+        ----------
+        path : str
+        maxdepth: int or None
+            If not None, the maximum number of levels to descend
+        withdirs: bool
+            Whether to include directory paths in the output. This is True
+            when used by glob, but users usually only want files.
+        kwargs are passed to ``ls``.
+
+        """
+        # TODO: allow equivalent of -name parameter
+        path = self._strip_protocol(path)
+        out = {}
+
+        # Add the root directory if withdirs is requested
+        # This is needed for posix glob compliance
+        if withdirs and path != "" and self.isdir(path):
+            out[path] = self.info(path)
+
+        for _, dirs, files in self._fsspec_walk(path, maxdepth, detail=True, **kwargs):
+            if withdirs:
+                files.update(dirs)
+            out.update({info["name"]: info for name, info in files.items()})
+        if not out and self.isfile(path):
+            # walk works on directories, but find should also return [path]
+            # when path happens to be a file
+            out[path] = {}
+        names = sorted(out)
+        if not detail:
+            return names
+        else:
+            return {name: out[name] for name in names}
 
     def expand_path(
         self,
@@ -1219,6 +1374,17 @@ class TosFileSystem(AbstractFileSystem):
                 self.key = key
                 self.version_id = version_id
 
+        def delete_objects(deleting_objects: List[DeletingObject]) -> None:
+            delete_resp = retryable_func_executor(
+                lambda: self.tos_client.delete_multi_objects(
+                    bucket, deleting_objects, quiet=True
+                ),
+                max_retry_num=self.max_retry_num,
+            )
+            if delete_resp.error:
+                for d in delete_resp.error:
+                    logger.warning("Deleted object: %s failed", d)
+
         while is_truncated:
 
             def _call_list_objects_type2(
@@ -1227,7 +1393,6 @@ class TosFileSystem(AbstractFileSystem):
                 return self.tos_client.list_objects_type2(
                     bucket,
                     prefix=key.rstrip("/") + "/",
-                    delimiter="/",
                     max_keys=LS_OPERATION_DEFAULT_MAX_ITEMS,
                     continuation_token=continuation_token,
                 )
@@ -1239,23 +1404,15 @@ class TosFileSystem(AbstractFileSystem):
             )
             is_truncated = resp.is_truncated
             continuation_token = resp.next_continuation_token
-            all_results.extend(resp.contents + resp.common_prefixes)
+            all_results = resp.contents
 
-        deleting_objects = [
-            DeletingObject(o.key if hasattr(o, "key") else o.prefix)
-            for o in all_results
-        ]
+            deleting_objects = [
+                DeletingObject(o.key if hasattr(o, "key") else o.prefix)
+                for o in all_results
+            ]
 
-        if deleting_objects:
-            delete_resp = retryable_func_executor(
-                lambda: self.tos_client.delete_multi_objects(
-                    bucket, deleting_objects, quiet=True
-                ),
-                max_retry_num=self.max_retry_num,
-            )
-            if delete_resp.error:
-                for d in delete_resp.error:
-                    logger.warning("Deleted object: %s failed", d)
+            if deleting_objects:
+                delete_objects(deleting_objects)
 
     def _copy_basic(self, path1: str, path2: str, **kwargs: Any) -> None:
         """Copy file between locations on tos.
@@ -1683,7 +1840,16 @@ class TosFileSystem(AbstractFileSystem):
                     )
                 except TosServerError as ex:
                     if e.status_code == TOS_SERVER_STATUS_CODE_NOT_FOUND:
-                        return False
+                        resp = retryable_func_executor(
+                            lambda: self.tos_client.list_objects_type2(
+                                bucket,
+                                key.rstrip("/") + "/",
+                                start_after=key.rstrip("/") + "/",
+                                max_keys=1,
+                            ),
+                            max_retry_num=self.max_retry_num,
+                        )
+                        return len(resp.contents) > 0
                     else:
                         raise ex
             else:
