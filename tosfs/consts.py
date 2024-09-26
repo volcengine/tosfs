@@ -35,4 +35,5 @@ TOSFS_LOG_FORMAT = "%(asctime)s %(name)s [%(levelname)s] %(filename)s:%(lineno)d
 
 # environment variable names
 ENV_NAME_TOSFS_LOGGING_LEVEL = "TOSFS_LOGGING_LEVEL"
+ENV_NAME_TOS_SDK_LOGGING_LEVEL = "TOS_SDK_LOGGING_LEVEL"
 ENV_NAME_TOS_BUCKET_TAG_ENABLE = "TOS_BUCKET_TAG_ENABLE"
