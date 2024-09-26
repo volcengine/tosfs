@@ -30,7 +30,6 @@ from volcengine.ServiceInfo import ServiceInfo
 
 PUT_TAG_ACTION_NAME = "PutBucketDoubleMeterTagging"
 GET_TAG_ACTION_NAME = "GetBucketTagging"
-DEL_TAG_ACTION_NAME = "DeleteBucketTagging"
 EMR_OPEN_API_VERSION = "2022-12-29"
 OPEN_API_HOST = "open.volcengineapi.com"
 ACCEPT_HEADER_KEY = "accept"
@@ -110,13 +109,6 @@ api_info = {
         {},
         {},
     ),
-    DEL_TAG_ACTION_NAME: ApiInfo(
-        "POST",
-        "/",
-        {"Action": DEL_TAG_ACTION_NAME, "Version": EMR_OPEN_API_VERSION},
-        {},
-        {},
-    ),
 }
 
 
@@ -133,7 +125,7 @@ class BucketTagAction(Service):
                     BucketTagAction._instance = object.__new__(cls)
         return BucketTagAction._instance
 
-    def __init__(self, key: str, secret: str, region: str = "cn-beijing") -> None:
+    def __init__(self, key: str, secret: str, region: str) -> None:
         """Init BucketTagAction."""
         super().__init__(self.get_service_info(region), self.get_api_info())
         self.set_ak(key)
@@ -151,19 +143,7 @@ class BucketTagAction(Service):
         if service_info:
             return service_info
 
-        if "VOLC_REGION" in os.environ:
-            return ServiceInfo(
-                OPEN_API_HOST,
-                {
-                    ACCEPT_HEADER_KEY: ACCEPT_HEADER_JSON_VALUE,
-                },
-                Credentials("", "", "emr", region),
-                CONNECTION_TIMEOUT_DEFAULT_SECONDS,
-                SOCKET_TIMEOUT_DEFAULT_SECONDS,
-                "http",
-            )
-
-        raise Exception("do not support region %s" % region)
+        raise Exception(f"Do not support region: {region}")
 
     def put_bucket_tag(self, bucket: str) -> tuple[str, bool]:
         """Put tag for bucket."""
@@ -188,23 +168,11 @@ class BucketTagAction(Service):
         try:
             res = self.get(GET_TAG_ACTION_NAME, params)
             res_json = json.loads(res)
-            logging.debug("The result of get_Bucket_tag is %s", res_json)
+            logging.debug("The get bucket tag's response is %s", res_json)
             return True
         except Exception as e:
             logging.debug("Get tag for %s is failed: %s", bucket, e)
             return False
-
-    def del_bucket_tag(self, bucket: str) -> None:
-        """Delete tag for bucket."""
-        params = {
-            "Bucket": bucket,
-        }
-        try:
-            res = self.json(DEL_TAG_ACTION_NAME, params, json.dumps(""))
-            res_json = json.loads(res)
-            logging.debug("The result of del_Bucket_tag is %s", res_json)
-        except Exception as e:
-            logging.debug("Delete tag for %s is failed: %s", bucket, e)
 
 
 def singleton(cls: Any) -> Any:
@@ -231,6 +199,7 @@ class BucketTagMgr:
         self.key = key
         self.secret = secret
         self.region = region
+        self.bucket_tag_service = BucketTagAction(self.key, self.secret, self.region)
 
     def add_bucket_tag(self, bucket: str) -> None:
         """Add tag for bucket."""
@@ -245,10 +214,9 @@ class BucketTagMgr:
             self.cached_bucket_set |= tagged_bucket_from_file_set
 
         need_tag_buckets = collect_bucket_set - self.cached_bucket_set
-        bucket_tag_service = BucketTagAction(self.key, self.secret, self.region)
 
         for res in self.executor.map(
-            bucket_tag_service.put_bucket_tag, need_tag_buckets
+            self.bucket_tag_service.put_bucket_tag, need_tag_buckets
         ):
             if res[1]:
                 self.cached_bucket_set.add(res[0])
