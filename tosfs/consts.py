@@ -31,6 +31,8 @@ APPEND_OPERATION_SMALL_FILE_THRESHOLD = 5 * 2**20  # 5MB
 
 LS_OPERATION_DEFAULT_MAX_ITEMS = 1000
 
+TOSFS_LOG_FORMAT = "%(asctime)s %(name)s [%(levelname)s] %(filename)s:%(lineno)d %(funcName)s : %(message)s"  # noqa: E501
+
 # environment variable names
 ENV_NAME_TOSFS_LOGGING_LEVEL = "TOSFS_LOGGING_LEVEL"
-TOSFS_LOG_FORMAT = "%(asctime)s %(name)s [%(levelname)s] %(filename)s:%(lineno)d %(funcName)s : %(message)s"  # noqa: E501
+ENV_NAME_TOS_BUCKET_TAG_ENABLE = "TOS_BUCKET_TAG_ENABLE"

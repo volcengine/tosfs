@@ -25,6 +25,7 @@ import tos
 from fsspec import AbstractFileSystem
 from fsspec.spec import AbstractBufferedFile
 from fsspec.utils import setup_logging as setup_logger
+from tos.auth import CredentialProviderAuth
 from tos.exceptions import TosClientError, TosServerError
 from tos.models import CommonPrefixInfo
 from tos.models2 import (
@@ -54,6 +55,7 @@ from tosfs.exceptions import TosfsError
 from tosfs.fsspec_utils import glob_translate
 from tosfs.mpu import MultipartUploader
 from tosfs.retry import retryable_func_executor
+from tosfs.tag import BucketTagMgr
 from tosfs.utils import find_bucket_key, get_brange
 
 logger = logging.getLogger("tosfs")
@@ -202,6 +204,10 @@ class TosFileSystem(AbstractFileSystem):
         )
         if version_aware:
             raise ValueError("Currently, version_aware is not supported.")
+
+        self.tag_enabled = os.environ.get("TOS_TAG_ENABLED", True)
+        if self.tag_enabled:
+            self._init_tag_manager()
 
         self.version_aware = version_aware
         self.default_block_size = (
@@ -2093,11 +2099,25 @@ class TosFileSystem(AbstractFileSystem):
 
         bucket, keypart = find_bucket_key(path)
         key, _, version_id = keypart.partition("?versionId=")
+
+        if self.tag_enabled:
+            self.bucket_tag_mgr.add_bucket_tag(bucket)
+
         return (
             bucket,
             key,
             version_id if self.version_aware and version_id else None,
         )
+
+    def _init_tag_manager(self) -> None:
+        auth = self.tos_client.auth
+        if isinstance(auth, CredentialProviderAuth):
+            credentials = auth.credentials_provider.get_credentials()
+            self.bucket_tag_mgr = BucketTagMgr(
+                credentials.get_ak(), credentials.get_sk(), auth.region
+            )
+        else:
+            raise TosfsError("Currently only support CredentialProviderAuth type")
 
     @staticmethod
     def _fill_dir_info(
