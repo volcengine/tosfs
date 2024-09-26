@@ -763,7 +763,7 @@ class TosFileSystem(AbstractFileSystem):
         lpath : str
             The local path of the file to put.
         rpath : str
-            The remote path of the file to put.
+            The remote path of the file to receive.
         chunksize : int, optional
             The size of the chunks to read from the file (default is 5 * 2**20).
         **kwargs : Any, optional
