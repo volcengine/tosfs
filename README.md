@@ -76,6 +76,26 @@ with tosfs.open('bucket/root/text.txt', mode='rb') as f:
     print(content)
 ```
 
+## Compatibility
+
+The tosfs package is compatible with the following Python and fsspec versions:
+
+* Python
+
+| Version | Supported |
+|---------|-----------|
+| 3.9     | ✅         |
+| 3.10    | ✅         |
+| 3.11    | ✅         |
+| 3.12    | ✅         |
+
+* fsspec
+
+| Version          | Supported |
+|---------------|------|
+| 2023.5.0      | ✅   |
+| 2024.9.0      | ✅   |
+
 ## Contributing
 Contributions are very welcome. To learn more, see the [Contributor Guide](https://github.com/volcengine/tosfs/blob/main/CONTRIBUTING.md).
 
