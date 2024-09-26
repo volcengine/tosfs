@@ -2141,6 +2141,7 @@ class TosFileSystem(AbstractFileSystem):
             "size": obj.size,
             "name": f"{bucket}/{obj.key}",
             "type": "file",
+            "LastModified": obj.last_modified,
         }
         if (
             isinstance(obj, ListedObjectVersion)

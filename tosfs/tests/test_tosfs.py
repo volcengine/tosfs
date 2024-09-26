@@ -48,7 +48,11 @@ def test_ls_dir(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> 
             f"Directory {temporary_workspace} not found in {detailed_list}"
         )
 
-    assert tosfs.ls(f"{bucket}/{temporary_workspace}", detail=False) == []
+    tosfs.touch(f"{bucket}/{temporary_workspace}/file")
+    for item in tosfs.ls(f"{bucket}/{temporary_workspace}", detail=True):
+        assert item["name"] in [f"{bucket}/{temporary_workspace}/file"]
+        assert item["LastModified"] is not None
+
     assert tosfs.ls(f"{bucket}/{temporary_workspace}/nonexistent", detail=False) == []
 
 
@@ -123,6 +127,12 @@ def test_info(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> No
         "size": 0,
         "StorageClass": "DIRECTORY",
     }
+    tosfs.touch(f"{bucket}/{temporary_workspace}/file")
+    file_info = tosfs.info(f"{bucket}/{temporary_workspace}/file")
+    assert file_info["name"] == f"{bucket}/{temporary_workspace}/file"
+    assert file_info["type"] == "file"
+    assert file_info["size"] == 0
+    assert file_info["LastModified"] is not None
 
     with pytest.raises(FileNotFoundError):
         tosfs.info(f"{bucket}/nonexistent")
