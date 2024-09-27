@@ -21,14 +21,12 @@ $ pip install tosfs
 
 ```python
 from tosfs.core import TosFileSystem
-from tos import StaticCredentialsProvider
 
 tosfs = TosFileSystem(
     key='ak',
     secret='sk',
     endpoint_url='http://tos-cn-beijing.volces.com',
     region='cn-beijing',
-    credentials_provider=StaticCredentialsProvider, # optional
 )
 ```
 
