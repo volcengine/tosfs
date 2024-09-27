@@ -129,19 +129,22 @@ def test_ls_iterate(
     assert len(result) == len([dir_name, another_dir_name])
 
     # Test list recursively
-    expected = [
-        f"{bucket}/{temporary_workspace}/{dir_name}",
-        f"{bucket}/{temporary_workspace}/{dir_name}/{file_name}",
-        f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}",
-        f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}/{sub_file_name}",
-        f"{bucket}/{temporary_workspace}/{another_dir_name}",
-    ]
-    result = [
-        item
-        for batch in tosfs.ls_iterate(f"{bucket}/{temporary_workspace}", recursive=True)
-        for item in batch
-    ]
-    assert sorted(result) == sorted(expected)
+    if tosfs._is_fns_bucket(bucket):
+        expected = [
+            f"{bucket}/{temporary_workspace}/{dir_name}",
+            f"{bucket}/{temporary_workspace}/{dir_name}/{file_name}",
+            f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}",
+            f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}/{sub_file_name}",
+            f"{bucket}/{temporary_workspace}/{another_dir_name}",
+        ]
+        result = [
+            item
+            for batch in tosfs.ls_iterate(
+                f"{bucket}/{temporary_workspace}", recursive=True
+            )
+            for item in batch
+        ]
+        assert sorted(result) == sorted(expected)
 
 
 def test_inner_rm(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
@@ -160,10 +163,10 @@ def test_info(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> No
     assert tosfs.info("") == {"name": "", "size": 0, "type": "directory"}
     assert tosfs.info("/") == {"name": "/", "size": 0, "type": "directory"}
     assert tosfs.info(bucket) == {
-        "Key": "proton-ci",
+        "Key": bucket,
         "Size": 0,
         "StorageClass": "BUCKET",
-        "name": "proton-ci",
+        "name": bucket,
         "size": 0,
         "type": "directory",
     }
@@ -424,43 +427,44 @@ def test_put(tosfs: TosFileSystem, bucket: str, temporary_workspace: str):
         ) as file:
             assert file.read() == "hello world"
 
-    with tempfile.TemporaryDirectory() as local_temp_dir:
-        dir_2 = f"{local_temp_dir}/生技??174号文/"
-        dir_3 = f"{local_temp_dir}/生技**174号文/"
-        dir_4 = f"{local_temp_dir}/生技_=+&^%#174号文/"
-        os.makedirs(dir_2)
-        os.makedirs(dir_3)
-        os.makedirs(dir_4)
-        with open(f"{dir_2}/test.txt", "w") as f:
-            f.write("hello world")
-        tosfs.put(
-            local_temp_dir,
-            f"{bucket}/{temporary_workspace}",
-            recursive=True,
-            disable_glob=True,
-        )
-        assert tosfs.exists(
-            f"{bucket}/{temporary_workspace}/{os.path.basename(local_temp_dir)}"
-            f"/生技??174号文/"
-        )
-        assert tosfs.exists(
-            f"{bucket}/{temporary_workspace}/{os.path.basename(local_temp_dir)}"
-            f"/生技??174号文/test.txt"
-        )
-        assert tosfs.exists(
-            f"{bucket}/{temporary_workspace}/{os.path.basename(local_temp_dir)}"
-            f"/生技**174号文/"
-        )
-        assert tosfs.exists(
-            f"{bucket}/{temporary_workspace}/{os.path.basename(local_temp_dir)}"
-            f"/生技_=+&^%#174号文/"
-        )
-        with tosfs.open(
-            f"{bucket}/{temporary_workspace}/"
-            f"{os.path.basename(local_temp_dir)}/生技??174号文/test.txt",
-            mode="r",
-        ) as file:
-            assert file.read() == "hello world"
+    if tosfs._is_fns_bucket(bucket):
+        with tempfile.TemporaryDirectory() as local_temp_dir:
+            dir_2 = f"{local_temp_dir}/生技??174号文/"
+            dir_3 = f"{local_temp_dir}/生技**174号文/"
+            dir_4 = f"{local_temp_dir}/生技_=+&^%#174号文/"
+            os.makedirs(dir_2)
+            os.makedirs(dir_3)
+            os.makedirs(dir_4)
+            with open(f"{dir_2}/test.txt", "w") as f:
+                f.write("hello world")
+            tosfs.put(
+                local_temp_dir,
+                f"{bucket}/{temporary_workspace}",
+                recursive=True,
+                disable_glob=True,
+            )
+            assert tosfs.exists(
+                f"{bucket}/{temporary_workspace}/{os.path.basename(local_temp_dir)}"
+                f"/生技??174号文/"
+            )
+            assert tosfs.exists(
+                f"{bucket}/{temporary_workspace}/{os.path.basename(local_temp_dir)}"
+                f"/生技??174号文/test.txt"
+            )
+            assert tosfs.exists(
+                f"{bucket}/{temporary_workspace}/{os.path.basename(local_temp_dir)}"
+                f"/生技**174号文/"
+            )
+            assert tosfs.exists(
+                f"{bucket}/{temporary_workspace}/{os.path.basename(local_temp_dir)}"
+                f"/生技_=+&^%#174号文/"
+            )
+            with tosfs.open(
+                f"{bucket}/{temporary_workspace}/"
+                f"{os.path.basename(local_temp_dir)}/生技??174号文/test.txt",
+                mode="r",
+            ) as file:
+                assert file.read() == "hello world"
 
     # test let special-char dir as the lpath
     with tempfile.TemporaryDirectory() as local_temp_dir:
@@ -996,11 +1000,24 @@ def test_file_write_append(
     content = "hello world"
     with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "w") as f:
         f.write(content)
-    with pytest.raises(TosServerError):
+
+    if tosfs._is_fns_bucket(bucket):
+        with pytest.raises(TosServerError):
+            with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "a") as f:
+                f.write(content)
+    else:
         with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "a") as f:
             f.write(content)
+        assert tosfs.info(f"{bucket}/{temporary_workspace}/{file_name}")[
+            "size"
+        ] == 2 * len(content)
+        with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "r") as f:
+            assert f.read() == content + content
 
     another_file = random_str()
+    if tosfs._is_hns_bucket(bucket):
+        tosfs.touch(f"{bucket}/{temporary_workspace}/{another_file}")
+
     with tosfs.open(f"{bucket}/{temporary_workspace}/{another_file}", "a") as f:
         f.write(content)
     with tosfs.open(f"{bucket}/{temporary_workspace}/{another_file}", "a") as f:
@@ -1021,11 +1038,20 @@ def test_big_file_append(
         f.write(content)
 
     append_content = "a" * 1024 * 1024
-    with pytest.raises(TosServerError):
+    if tosfs._is_fns_bucket(bucket):
+        with pytest.raises(TosServerError):
+            with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "a") as f:
+                f.write(append_content)
+    else:
         with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "a") as f:
             f.write(append_content)
 
+        with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "r") as f:
+            assert f.read() == content + append_content
+
     another_file = random_str()
+    if tosfs._is_hns_bucket(bucket):
+        tosfs.touch(f"{bucket}/{temporary_workspace}/{another_file}")
     with tosfs.open(f"{bucket}/{temporary_workspace}/{another_file}", "a") as f:
         f.write(content)
 

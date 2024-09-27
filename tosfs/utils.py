@@ -17,7 +17,7 @@ import random
 import re
 import string
 import tempfile
-from typing import Generator, Optional, Tuple
+from typing import Generator, Tuple
 
 
 def random_str(length: int = 5) -> str:
@@ -99,17 +99,3 @@ def get_brange(size: int, block: int) -> Generator[Tuple[int, int], None, None]:
     """
     for offset in range(0, size, block):
         yield offset, min(offset + block - 1, size - 1)
-
-
-def is_dir(key: str, prefix: Optional[str]) -> bool:
-    """Check if the key is a directory.
-
-    Parameters
-    ----------
-    key : str
-        The key to check.
-    prefix: str, optional
-        The key prefix.
-
-    """
-    return key.endswith("/") or (key.startswith(prefix) if prefix is not None else True)
