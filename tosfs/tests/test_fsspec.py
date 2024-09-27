@@ -738,6 +738,23 @@ def test_mv(fsspecfs: Any, bucket: str, temporary_workspace: str):
     ), "Original file should not exist after rename"
     assert fsspecfs.exists(renamed_file_path), "Renamed file should exist"
 
+    # test mv source dir into target dir recursively
+    fsspecfs.rm(source_folder, recursive=True)
+    fsspecfs.rm(target_folder, recursive=True)
+    fsspecfs.mkdir(source_folder)
+    fsspecfs.mkdir(target_folder)
+    assert fsspecfs.exists(source_folder)
+    assert fsspecfs.exists(target_folder)
+    source_file = f"{random_str()}.txt"
+    with fsspecfs.open(f"{source_folder}/{source_file}", "wb") as f:
+        f.write(test_file_content)
+    assert fsspecfs.exists(f"{source_folder}/{source_file}")
+    fsspecfs.mv(source_folder, target_folder, recursive=True)
+    assert fsspecfs.exists(f"{target_folder}/source_folder")
+    assert fsspecfs.exists(f"{target_folder}/source_folder/{source_file}")
+    assert not fsspecfs.exists(f"{source_folder}")
+    assert not fsspecfs.exists(f"{source_folder}/{source_file}")
+
 
 def test_get(fsspecfs: Any, bucket: str, temporary_workspace: str):
     remote_file_path = f"{bucket}/{temporary_workspace}/test_get_file.txt"
