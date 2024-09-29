@@ -39,6 +39,7 @@ from tos.models2 import (
 
 from tosfs.consts import (
     APPEND_OPERATION_SMALL_FILE_THRESHOLD,
+    ENV_NAME_TOS_BUCKET_TAG_ENABLE,
     ENV_NAME_TOS_SDK_LOGGING_LEVEL,
     ENV_NAME_TOSFS_LOGGING_LEVEL,
     FILE_OPERATION_READ_WRITE_BUFFER_SIZE,
@@ -206,8 +207,11 @@ class TosFileSystem(AbstractFileSystem):
         if version_aware:
             raise ValueError("Currently, version_aware is not supported.")
 
-        self.tag_enabled = os.environ.get("TOS_TAG_ENABLED", True)
+        self.tag_enabled = (
+            os.environ.get(ENV_NAME_TOS_BUCKET_TAG_ENABLE, "true").lower() == "true"
+        )
         if self.tag_enabled:
+            logger.debug("The tos bucket tag is enabled.")
             self._init_tag_manager()
 
         self.version_aware = version_aware
