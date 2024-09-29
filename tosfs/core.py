@@ -782,7 +782,7 @@ class TosFileSystem(AbstractFileSystem):
 
         try:
             return retryable_func_executor(
-                lambda: self.tos_client.head_object(bucket, key) or True,
+                lambda: self.tos_client.head_object(bucket, key) and True,
                 max_retry_num=self.max_retry_num,
             )
         except TosClientError as e:
@@ -818,7 +818,7 @@ class TosFileSystem(AbstractFileSystem):
 
         try:
             return retryable_func_executor(
-                lambda: self.tos_client.head_object(bucket, key) or True,
+                lambda: self.tos_client.head_object(bucket, key) and True,
                 max_retry_num=self.max_retry_num,
             )
         except TosClientError as e:
