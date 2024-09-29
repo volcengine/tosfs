@@ -189,25 +189,25 @@ def test_isdir(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> N
     assert not tosfs.isdir("")
     assert not tosfs.isdir("/")
     assert not tosfs.isdir(bucket)
-    assert tosfs.isdir(f"{bucket}/{temporary_workspace}") == True
-    assert tosfs.isdir(f"{bucket}/{temporary_workspace}/") == True
-    assert tosfs.isdir(f"{bucket}/{temporary_workspace}/nonexistent") == False
-    assert tosfs.isdir(f"{bucket}/{temporary_workspace}/nonexistent/") == False
+    assert tosfs.isdir(f"{bucket}/{temporary_workspace}")
+    assert tosfs.isdir(f"{bucket}/{temporary_workspace}/")
+    assert not tosfs.isdir(f"{bucket}/{temporary_workspace}/nonexistent")
+    assert not tosfs.isdir(f"{bucket}/{temporary_workspace}/nonexistent/")
 
     file_name = random_str()
     tosfs.touch(f"{bucket}/{temporary_workspace}/{file_name}")
-    assert tosfs.isdir(f"{bucket}/{temporary_workspace}/{file_name}") == False
-    assert tosfs.isdir(f"{bucket}/{temporary_workspace}/{file_name}/") == False
+    assert not tosfs.isdir(f"{bucket}/{temporary_workspace}/{file_name}")
+    assert not tosfs.isdir(f"{bucket}/{temporary_workspace}/{file_name}/")
 
 
 def test_isfile(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
     file_name = random_str()
     tosfs.touch(f"{bucket}/{temporary_workspace}/{file_name}")
-    assert tosfs.isfile(f"{bucket}/{temporary_workspace}/{file_name}") == True
-    assert tosfs.isfile(f"{bucket}/{temporary_workspace}/{file_name}/") == False
-    assert tosfs.isfile(f"{bucket}/{temporary_workspace}/nonexistfile") == False
-    assert tosfs.isfile(f"{bucket}/{temporary_workspace}") == False
-    assert tosfs.isfile(f"{bucket}/{temporary_workspace}/") == False
+    assert tosfs.isfile(f"{bucket}/{temporary_workspace}/{file_name}")
+    assert not tosfs.isfile(f"{bucket}/{temporary_workspace}/{file_name}/")
+    assert not tosfs.isfile(f"{bucket}/{temporary_workspace}/nonexistfile")
+    assert not tosfs.isfile(f"{bucket}/{temporary_workspace}")
+    assert not tosfs.isfile(f"{bucket}/{temporary_workspace}/")
 
 
 def test_exists_bucket(
