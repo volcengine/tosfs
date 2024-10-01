@@ -107,7 +107,7 @@ class TosFileSystem(AbstractFileSystem):
         region: Optional[str] = None,
         max_retry_num: int = 20,
         max_connections: int = 1024,
-        connection_time: int = 10,
+        connection_timeout: int = 10,
         socket_timeout: int = 30,
         high_latency_log_threshold: int = 100,
         version_aware: bool = False,
@@ -139,7 +139,7 @@ class TosFileSystem(AbstractFileSystem):
         max_connections : int, optional
             The maximum number of HTTP connections that can be opened in the
             connection pool (default is 1024).
-        connection_time : int, optional
+        connection_timeout : int, optional
             The time to keep a connection open in seconds (default is 10).
         socket_timeout : int, optional
             The socket read and write timeout time for a single request after
@@ -196,7 +196,7 @@ class TosFileSystem(AbstractFileSystem):
             region,
             max_retry_count=0,
             max_connections=max_connections,
-            connection_time=connection_time,
+            connection_time=connection_timeout,
             socket_timeout=socket_timeout,
             high_latency_log_threshold=high_latency_log_threshold,
             credentials_provider=credentials_provider,
@@ -254,15 +254,15 @@ class TosFileSystem(AbstractFileSystem):
             as they do for the built-in `open` function.
         block_size: int
             Size of data-node blocks if reading
+        version_id : str
+            Explicit version of the object to open.  This requires that the tos
+            filesystem is version aware and bucket versioning is enabled on the
+            relevant bucket.
         fill_cache: bool
             If seeking to new a part of the file beyond the current buffer,
             with this True, the buffer will be filled between the sections to
             best support random access. When reading only a few specific chunks
             out of a file, performance may be better if False.
-        version_id : str
-            Explicit version of the object to open.  This requires that the tos
-            filesystem is version aware and bucket versioning is enabled on the
-            relevant bucket.
         cache_type : str
             See fsspec's documentation for available cache_type values. Set to "none"
             if no caching is desired. If None, defaults to ``self.default_cache_type``.
@@ -1838,7 +1838,7 @@ class TosFileSystem(AbstractFileSystem):
             include_self=include_self,
             versions=versions,
         ):
-            if isinstance(obj, CommonPrefixInfo):
+            if isinstance(obj, CommonPrefixInfo) and delimiter == "/":
                 dirs.append(self._fill_dir_info(bucket, obj))
             elif obj.key.endswith("/"):
                 dirs.append(self._fill_dir_info(bucket, None, obj.key))
@@ -2184,12 +2184,17 @@ class TosFile(AbstractBufferedFile):
     ):
         """Instantiate a TOS file."""
         bucket, key, path_version_id = fs._split_path(path)
-        if not key:
-            raise ValueError("Attempt to open non key-like path: %s" % path)
+        self._check_init_params(key, path, mode, block_size)
 
-        if "r" not in mode and int(block_size) < MPU_PART_SIZE_THRESHOLD:
-            raise ValueError(
-                f"Block size must be >= {MPU_PART_SIZE_THRESHOLD // (2**20)}MB."
+        if "r" not in mode:
+            self.multipart_uploader = MultipartUploader(
+                fs=fs,
+                bucket=bucket,
+                key=key,
+                part_size=fs.multipart_size,
+                thread_pool_size=fs.multipart_thread_pool_size,
+                staging_buffer_size=fs.multipart_staging_buffer_size,
+                multipart_threshold=fs.multipart_threshold,
             )
 
         super().__init__(
@@ -2211,35 +2216,41 @@ class TosFile(AbstractBufferedFile):
         self.append_block = False
         self.buffer: Optional[io.BytesIO] = io.BytesIO()
 
-        self.multipart_uploader = MultipartUploader(
-            fs=fs,
-            bucket=bucket,
-            key=key,
-            part_size=fs.multipart_size,
-            thread_pool_size=fs.multipart_thread_pool_size,
-            staging_buffer_size=fs.multipart_staging_buffer_size,
-            multipart_threshold=fs.multipart_threshold,
-        )
-
-        if "a" in mode and fs.exists(path):
-            head = retryable_func_executor(
-                lambda: self.fs.tos_client.head_object(bucket, key),
-                max_retry_num=self.fs.max_retry_num,
-            )
-            loc = head.content_length
-
-            if loc < APPEND_OPERATION_SMALL_FILE_THRESHOLD:
-                # existing file too small for multi-upload: download
-                self.write(self.fs.cat(self.path))
-            else:
-                self.append_block = True
-            self.loc = loc
+        if "a" in mode:
+            try:
+                head = retryable_func_executor(
+                    lambda: self.fs.tos_client.head_object(bucket, key),
+                    max_retry_num=self.fs.max_retry_num,
+                )
+                loc = head.content_length
+                if loc < APPEND_OPERATION_SMALL_FILE_THRESHOLD:
+                    # existing file too small for multi-upload: download
+                    self.write(self.fs.cat(self.path))
+                else:
+                    self.append_block = True
+                self.loc = loc
+            except TosServerError as e:
+                if e.status_code == TOS_SERVER_STATUS_CODE_NOT_FOUND:
+                    pass
+                else:
+                    raise e
 
         if "w" in mode:
             # check the local staging dir if not exist, create it
             for staging_dir in fs.multipart_staging_dirs:
                 if not os.path.exists(staging_dir):
                     os.makedirs(staging_dir)
+
+    def _check_init_params(
+        self, key: str, path: str, mode: str, block_size: Union[int, str]
+    ) -> None:
+        if not key:
+            raise ValueError("Attempt to open non key-like path: %s" % path)
+
+        if "r" not in mode and int(block_size) < MPU_PART_SIZE_THRESHOLD:
+            raise ValueError(
+                f"Block size must be >= {MPU_PART_SIZE_THRESHOLD // (2**20)}MB."
+            )
 
     def _initiate_upload(self) -> None:
         """Create remote file/upload."""

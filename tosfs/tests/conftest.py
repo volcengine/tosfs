@@ -39,7 +39,7 @@ def tosfs(_tosfs_env_prepare: None) -> TosFileSystem:
         region=os.environ.get("TOS_REGION"),
         credentials_provider=EnvCredentialsProvider(),
         max_retry_num=1000,
-        connection_time=300,
+        connection_timeout=300,
         socket_timeout=300,
         multipart_size=4 << 20,
         multipart_threshold=4 << 20,
