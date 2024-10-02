@@ -105,6 +105,7 @@ class TosFileSystem(AbstractFileSystem):
         key: str = "",
         secret: str = "",
         region: Optional[str] = None,
+        security_token: Optional[str] = None,
         max_retry_num: int = 20,
         max_connections: int = 1024,
         connection_time: int = 10,
@@ -120,6 +121,15 @@ class TosFileSystem(AbstractFileSystem):
         multipart_thread_pool_size: int = max(2, os.cpu_count() or 1),
         multipart_staging_buffer_size: int = 4 << 10,
         multipart_threshold: int = 10 << 20,
+        enable_crc: bool = True,
+        enable_verify_ssl: bool = True,
+        dns_cache_timeout: int = 0,
+        proxy_host: Optional[str] = None,
+        proxy_port: Optional[int] = None,
+        proxy_username: Optional[str] = None,
+        proxy_password: Optional[str] = None,
+        disable_encoding_meta: Optional[bool] = None,
+        except100_continue_threshold: int = 65536,
         **kwargs: Any,
     ) -> None:
         """Initialise the TosFileSystem.
@@ -134,6 +144,8 @@ class TosFileSystem(AbstractFileSystem):
             The secret access key(sk) to access the TOS service.
         region : str, optional
             The region of the TOS service.
+        security_token : str, optional
+            The temporary security token to access the TOS service.
         max_retry_num : int, optional
             The maximum number of retries for a failed request (default is 20).
         max_connections : int, optional
@@ -185,6 +197,31 @@ class TosFileSystem(AbstractFileSystem):
             writing data to the given object storage, if the write data size is less
             than threshold, will write data via simple put instead of multipart upload.
              (default is 10 MB).
+        enable_crc : bool
+            Whether to enable client side CRC check after upload, default is true
+        enable_verify_ssl : bool
+            Whether to verify the SSL certificate, default is true.
+        dns_cache_timeout : int
+            The DNS cache timeout in minutes, if it is less than or equal to 0,
+            it means to close the DNS cache, default is 0.
+        proxy_host : str, optional
+            The host address of the proxy server, currently only supports
+            the http protocol.
+        proxy_port : int, optional
+            The port of the proxy server.
+        proxy_username : str, optional
+            The username to use when connecting to the proxy server.
+        proxy_password : str, optional
+            The password to use when connecting to the proxy server.
+        disable_encoding_meta : bool, optional
+            Whether to encode user-defined metadata x-tos-meta- */Content-Disposition,
+            default encoding, no encoding when set to true.
+        except100_continue_threshold : int
+            When it is greater than 0, it means that the interface related to the
+            upload object opens the 100-continue mechanism for requests with the
+            length of the data to be uploaded greater than the threshold
+            (if the length of the data cannot be predicted, it is uniformly determined
+            to be greater than the threshold), unit byte, default 65536
         kwargs : Any, optional
             Additional arguments.
 
@@ -194,15 +231,22 @@ class TosFileSystem(AbstractFileSystem):
             secret,
             endpoint_url,
             region,
+            security_token=security_token,
             max_retry_count=0,
             max_connections=max_connections,
             connection_time=connection_time,
             socket_timeout=socket_timeout,
             high_latency_log_threshold=high_latency_log_threshold,
             credentials_provider=credentials_provider,
-            enable_crc=False,
-            enable_verify_ssl=False,
-            disable_encoding_meta=True,
+            enable_crc=enable_crc,
+            enable_verify_ssl=enable_verify_ssl,
+            disable_encoding_meta=disable_encoding_meta,
+            dns_cache_time=dns_cache_timeout,
+            proxy_host=proxy_host,
+            proxy_port=proxy_port,
+            proxy_username=proxy_username,
+            proxy_password=proxy_password,
+            except100_continue_threshold=except100_continue_threshold,
         )
         if version_aware:
             raise ValueError("Currently, version_aware is not supported.")
