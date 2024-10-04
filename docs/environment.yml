@@ -1,0 +1,7 @@
+name: tosfs
+channels:
+  - defaults
+dependencies:
+  - python=3.9
+  - sphinx
+  - sphinx_rtd_theme
