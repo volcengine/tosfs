@@ -1,7 +1,14 @@
 # tosfs
 
 [![PyPI version](https://badge.fury.io/py/tosfs.svg)](https://pypi.python.org/pypi/tosfs/)
+[![Status](https://img.shields.io/pypi/status/tosfs.svg)](https://pypi.org/project/tosfs/)
+[![Python Version](https://img.shields.io/pypi/pyversions/tosfs.svg)](https://pypi.org/project/tosfs/)
+[![License](https://img.shields.io/pypi/l/tosfs)](https://opensource.org/licenses/Apache-2.0)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
+[![Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Doc Status](https://readthedocs.org/projects/tosfs/badge/?version=latest)](https://tosfs.readthedocs.io/en/latest/?badge=latest)
 ![Build](https://github.com/volcengine/tosfs/workflows/CI/badge.svg)
+
 
 TOSFS builds on [Volcengine TOS Python SDK](https://github.com/volcengine/ve-tos-python-sdk) to provide a convenient Python filesystem interface for [TOS（Tinder Object Storage）](https://www.volcengine.com/docs/6349/74820).
 
