@@ -1599,6 +1599,7 @@ class TosFileSystem(AbstractFileSystem):
             self._parent(o["name"]): {
                 "Key": self._parent(o["name"]).rstrip("/"),
                 "Size": 0,
+                "size": 0,
                 "name": self._parent(o["name"]).rstrip("/"),
                 "type": "directory",
             }
@@ -1767,6 +1768,7 @@ class TosFileSystem(AbstractFileSystem):
                     "name": fullpath,
                     "Key": fullpath,
                     "Size": 0,
+                    "size": 0,
                     "type": "directory",
                 }
 
@@ -2026,6 +2028,7 @@ class TosFileSystem(AbstractFileSystem):
             "name": name,
             "Key": name,
             "Size": 0,
+            "size": 0,
             "type": "directory",
         }
 
