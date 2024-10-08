@@ -21,7 +21,7 @@ import logging
 import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any
+from typing import Any, Optional
 
 from volcengine.ApiInfo import ApiInfo
 from volcengine.base.Service import Service
@@ -125,11 +125,23 @@ class BucketTagAction(Service):
                     BucketTagAction._instance = object.__new__(cls)
         return BucketTagAction._instance
 
-    def __init__(self, key: str, secret: str, region: str) -> None:
+    def __init__(
+        self,
+        key: Optional[str],
+        secret: Optional[str],
+        session_token: Optional[str],
+        region: str,
+    ) -> None:
         """Init BucketTagAction."""
         super().__init__(self.get_service_info(region), self.get_api_info())
-        self.set_ak(key)
-        self.set_sk(secret)
+        if key:
+            self.set_ak(key)
+
+        if secret:
+            self.set_sk(secret)
+
+        if session_token:
+            self.set_session_token(session_token)
 
     @staticmethod
     def get_api_info() -> dict:
@@ -192,14 +204,23 @@ def singleton(cls: Any) -> Any:
 class BucketTagMgr:
     """BucketTagMgr is a class to manage the tag of bucket."""
 
-    def __init__(self, key: str, secret: str, region: str):
+    def __init__(
+        self,
+        key: Optional[str],
+        secret: Optional[str],
+        session_token: Optional[str],
+        region: str,
+    ):
         """Init BucketTagMgr."""
         self.executor = ThreadPoolExecutor(max_workers=THREAD_POOL_SIZE)
         self.cached_bucket_set: set = set()
         self.key = key
         self.secret = secret
+        self.session_token = session_token
         self.region = region
-        self.bucket_tag_service = BucketTagAction(self.key, self.secret, self.region)
+        self.bucket_tag_service = BucketTagAction(
+            self.key, self.secret, self.session_token, self.region
+        )
 
     def add_bucket_tag(self, bucket: str) -> None:
         """Add tag for bucket."""
