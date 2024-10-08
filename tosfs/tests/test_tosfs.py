@@ -123,9 +123,10 @@ def test_info(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> No
     }
     assert tosfs.info(f"{bucket}/{temporary_workspace}") == {
         "name": f"{bucket}/{temporary_workspace}",
+        "Key": f"{bucket}/{temporary_workspace}",
         "type": "directory",
         "size": 0,
-        "StorageClass": "DIRECTORY",
+        "Size": 0,
     }
     tosfs.touch(f"{bucket}/{temporary_workspace}/file")
     file_info = tosfs.info(f"{bucket}/{temporary_workspace}/file")
