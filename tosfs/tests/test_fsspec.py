@@ -547,6 +547,9 @@ def test_du(fsspecfs: Any, bucket: str, temporary_workspace: str):
     }
     assert sizes == expected_sizes, f"Expected sizes {expected_sizes}, got {sizes}"
 
+    with pytest.raises(ValueError, match="maxdepth must be at least 1"):
+        fsspecfs.du(f"{bucket}/{temporary_workspace}", total=False, maxdepth=0)
+
     # Test maxdepth
     sizes_maxdepth_1 = fsspecfs.du(
         f"{bucket}/{temporary_workspace}", total=False, maxdepth=2
@@ -681,9 +684,17 @@ def test_cat(fsspecfs: Any, bucket: str, temporary_workspace: str):
 
     # Test Case 3: Error handling with on_error="omit"
     non_existent_path = f"{subdir_path}/nonexistent.txt"
-    result = fsspecfs.cat([file1_path, non_existent_path], on_error="omit")
+    result = fsspecfs.cat(
+        [file1_path, non_existent_path], recursive=True, on_error="omit"
+    )
     assert result == {
         fsspecfs._strip_protocol(file1_path): b"Hello, World!"
+    }, "Error handling with omit failed"
+
+    result = fsspecfs.cat(f"{subdir_path}/*", recursive=True, on_error="omit")
+    assert result == {
+        fsspecfs._strip_protocol(file1_path): b"Hello, World!",
+        fsspecfs._strip_protocol(file2_path): b"Goodbye, World!",
     }, "Error handling with omit failed"
 
     # Test Case 4: Error handling with on_error="return"
@@ -822,3 +833,47 @@ def test_put(fsspecfs: Any, bucket: str, temporary_workspace: str):
             assert (
                 downloaded_data == test_data
             ), "The downloaded file's contents should match the original test data."
+
+
+def test_fs_read_block(fsspecfs: Any, bucket: str, temporary_workspace: str):
+    file_name = random_str()
+    path = f"{bucket}/{temporary_workspace}/{file_name}.txt"
+    data = b"ab\n" + b"a" * (1 * 2**20) + b"\nab"
+    with fsspecfs.open(path, "wb") as f:
+        f.write(data)
+
+    assert fsspecfs.read_block(path, 0, 3) == b"ab\n"
+
+    non_exist_path = f"{bucket}/{temporary_workspace}/non_exist.txt"
+    with pytest.raises(FileNotFoundError):
+        fsspecfs.read_block(non_exist_path, 0, 3)
+
+    dir_name = random_str()
+    path = f"{bucket}/{temporary_workspace}/{dir_name}"
+    fsspecfs.mkdir(path)
+    assert fsspecfs.exists(path)
+
+    with pytest.raises(IsADirectoryError):
+        fsspecfs.read_block(path, 0, 3)
+
+
+def test_tail(fsspecfs: Any, bucket: str, temporary_workspace: str):
+    file_name = random_str()
+    path = f"{bucket}/{temporary_workspace}/{file_name}.txt"
+    data = b"ab\n" + b"a" * (1 * 2**20) + b"\nab"
+    with fsspecfs.open(path, "wb") as f:
+        f.write(data)
+
+    assert fsspecfs.tail(path, 3) == b"\nab"
+
+    non_exist_path = f"{bucket}/{temporary_workspace}/non_exist.txt"
+    with pytest.raises(FileNotFoundError):
+        fsspecfs.tail(non_exist_path, 3)
+
+    dir_name = random_str()
+    path = f"{bucket}/{temporary_workspace}/{dir_name}"
+    fsspecfs.mkdir(path)
+    assert fsspecfs.exists(path)
+
+    with pytest.raises(IsADirectoryError):
+        fsspecfs.tail(path, 3)

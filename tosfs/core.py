@@ -523,7 +523,7 @@ class TosFileSystem(AbstractFileSystem):
         if info := self._object_info(bucket, key, version_id):
             return info
 
-        return self._try_dir_info(bucket, key, path, fullpath)
+        return self._get_dir_info(bucket, key, path, fullpath)
 
     def exists(self, path: str, **kwargs: Any) -> bool:
         """Check if a path exists in the TOS.
@@ -1107,6 +1107,9 @@ class TosFileSystem(AbstractFileSystem):
         bucket, key, _ = self._split_path(path)
         if not bucket:
             raise ValueError("Cannot access all of TOS without specify a bucket.")
+
+        if maxdepth is not None and maxdepth < 1:
+            raise ValueError("maxdepth must be at least 1")
 
         if maxdepth and prefix:
             raise ValueError(
@@ -1745,7 +1748,7 @@ class TosFileSystem(AbstractFileSystem):
 
         return {}
 
-    def _try_dir_info(self, bucket: str, key: str, path: str, fullpath: str) -> dict:
+    def _get_dir_info(self, bucket: str, key: str, path: str, fullpath: str) -> dict:
         try:
             # We check to see if the path is a directory by attempting to list its
             # contexts. If anything is found, it is indeed a directory
@@ -1762,9 +1765,9 @@ class TosFileSystem(AbstractFileSystem):
             if out.key_count > 0 or out.contents or out.common_prefixes:
                 return {
                     "name": fullpath,
+                    "Key": fullpath,
+                    "Size": 0,
                     "type": "directory",
-                    "size": 0,
-                    "StorageClass": "DIRECTORY",
                 }
 
             raise FileNotFoundError(path)
@@ -2228,18 +2231,6 @@ class TosFile(AbstractBufferedFile):
     ):
         """Instantiate a TOS file."""
         bucket, key, path_version_id = fs._split_path(path)
-        self._check_init_params(key, path, mode, block_size)
-
-        if "r" not in mode:
-            self.multipart_uploader = MultipartUploader(
-                fs=fs,
-                bucket=bucket,
-                key=key,
-                part_size=fs.multipart_size,
-                thread_pool_size=fs.multipart_thread_pool_size,
-                staging_buffer_size=fs.multipart_staging_buffer_size,
-                multipart_threshold=fs.multipart_threshold,
-            )
 
         super().__init__(
             fs,
@@ -2259,6 +2250,19 @@ class TosFile(AbstractBufferedFile):
         self.autocommit = autocommit
         self.append_block = False
         self.buffer: Optional[io.BytesIO] = io.BytesIO()
+
+        self._check_init_params(key, path, mode, block_size)
+
+        if "r" not in mode:
+            self.multipart_uploader = MultipartUploader(
+                fs=fs,
+                bucket=bucket,
+                key=key,
+                part_size=fs.multipart_size,
+                thread_pool_size=fs.multipart_thread_pool_size,
+                staging_buffer_size=fs.multipart_staging_buffer_size,
+                multipart_threshold=fs.multipart_threshold,
+            )
 
         if "a" in mode:
             try:
@@ -2290,6 +2294,9 @@ class TosFile(AbstractBufferedFile):
     ) -> None:
         if not key:
             raise ValueError("Attempt to open non key-like path: %s" % path)
+
+        if "r" in mode and self.fs.isdir(path):
+            raise IsADirectoryError("Can not read a directory path: %s" % path)
 
         if "r" not in mode and int(block_size) < MPU_PART_SIZE_THRESHOLD:
             raise ValueError(
