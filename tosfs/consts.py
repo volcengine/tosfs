@@ -17,6 +17,10 @@
 # Tos server response status codes
 TOS_SERVER_STATUS_CODE_NOT_FOUND = 404
 
+# tos bucket type (hns, fns)
+TOS_BUCKET_TYPE_HNS = "hns"
+TOS_BUCKET_TYPE_FNS = "fns"
+
 MANAGED_COPY_MAX_THRESHOLD = 5 * 2**30
 MANAGED_COPY_MIN_THRESHOLD = 5 * 2**20
 
