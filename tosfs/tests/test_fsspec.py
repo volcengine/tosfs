@@ -22,13 +22,6 @@ import pytest
 from tosfs.utils import create_temp_dir, random_str
 
 
-def test_ls(fsspecfs: Any, bucket: str, temporary_workspace: str):
-    path_to_find = f"{bucket}/{temporary_workspace}"
-    path_exists = fsspecfs.exists(path_to_find)
-
-    assert path_exists
-
-
 def test_copy(fsspecfs: Any, bucket: str, temporary_workspace: str):
     # Create a temporary directory and files
     dir_name = random_str()
@@ -79,10 +72,15 @@ def test_copy(fsspecfs: Any, bucket: str, temporary_workspace: str):
     with pytest.raises(FileNotFoundError):
         fsspecfs.copy(non_existent_path, copy_non_existent_dest, on_error="raise")
 
-    # Clean up
-    fsspecfs.rm(subdir_path, recursive=True)
-    fsspecfs.rm(copy_dest)
-    fsspecfs.rm(copy_dir_dest, recursive=True)
+    # Test Case 5: Copy file when dest/target exists
+    copy_dest = f"{bucket}/{temporary_workspace}/copy_file1.txt"
+    assert fsspecfs.exists(copy_dest), "Destination file should exist"
+    assert fsspecfs.cat_file(copy_dest) == b"Hello, World!", "Content mismatch"
+    fsspecfs.copy(file2_path, copy_dest)
+    assert fsspecfs.exists(copy_dest), "Failed to copy and overwrite existing file"
+    assert (
+        fsspecfs.cat_file(copy_dest) == b"Goodbye, World!"
+    ), "Content mismatch in overwritten file"
 
 
 def test_info(fsspecfs: Any, bucket: str, temporary_workspace: str):

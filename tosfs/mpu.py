@@ -107,7 +107,8 @@ class MultipartUploader:
 
             self.staging_buffer = io.BytesIO()
 
-    def _upload_staged_files(self) -> None:
+    def upload_staged_files(self) -> None:
+        """Upload the staged files to the object store."""
         self._flush_staging_buffer(True)
         futures = []
         for i, staging_file in enumerate(self.staging_files):
