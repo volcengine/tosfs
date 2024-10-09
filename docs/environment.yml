@@ -17,7 +17,8 @@ channels:
   - defaults
 dependencies:
   - python=3.9
-  - sphinx
-  - sphinx_rtd_theme
-  - sphinx_design
-  - numpydoc
+  - pip:
+    - sphinx
+    - sphinx_rtd_theme
+    - sphinx_design
+    - numpydoc
