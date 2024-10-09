@@ -1913,7 +1913,9 @@ class TosFileSystem(AbstractFileSystem):
     def _fill_dir_info(
         bucket: str, common_prefix: Optional[CommonPrefixInfo], key: str = ""
     ) -> dict:
-        name = "/".join([bucket, common_prefix.prefix[:-1] if common_prefix else key])
+        name = "/".join(
+            [bucket, common_prefix.prefix[:-1] if common_prefix else key]
+        ).rstrip("/")
         return {
             "name": name,
             "Key": name,
