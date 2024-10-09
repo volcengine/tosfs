@@ -105,7 +105,7 @@ class TosFileSystem(AbstractFileSystem):
         key: str = "",
         secret: str = "",
         region: Optional[str] = None,
-        security_token: Optional[str] = None,
+        session_token: Optional[str] = None,
         max_retry_num: int = 20,
         max_connections: int = 1024,
         connection_timeout: int = 10,
@@ -144,8 +144,8 @@ class TosFileSystem(AbstractFileSystem):
             The secret access key(sk) to access the TOS service.
         region : str, optional
             The region of the TOS service.
-        security_token : str, optional
-            The temporary security token to access the TOS service.
+        session_token : str, optional
+            The temporary session token to access the TOS service.
         max_retry_num : int, optional
             The maximum number of retries for a failed request (default is 20).
         max_connections : int, optional
@@ -231,7 +231,7 @@ class TosFileSystem(AbstractFileSystem):
             secret,
             endpoint_url,
             region,
-            security_token=security_token,
+            security_token=session_token,
             max_retry_count=0,
             max_connections=max_connections,
             connection_time=connection_timeout,
@@ -2012,10 +2012,17 @@ class TosFileSystem(AbstractFileSystem):
         if isinstance(auth, CredentialProviderAuth):
             credentials = auth.credentials_provider.get_credentials()
             self.bucket_tag_mgr = BucketTagMgr(
-                credentials.get_ak(), credentials.get_sk(), auth.region
+                credentials.get_ak(),
+                credentials.get_sk(),
+                credentials.get_security_token(),
+                auth.region,
             )
         else:
-            raise TosfsError("Currently only support CredentialProviderAuth type")
+            raise TosfsError(
+                "Currently only support CredentialProviderAuth type, "
+                "please check if you set (ak & sk) or (session token) "
+                "correctly."
+            )
 
     @staticmethod
     def _fill_dir_info(
