@@ -138,7 +138,7 @@ def _is_retryable_tos_server_exception(e: TosError) -> bool:
 
     # not all conflict errors are retryable
     if e.status_code == CONFLICT_CODE:
-        return e.code not in TOS_SERVER_NOT_RETRYABLE_CONFLICT_ERROR_CODES
+        return e.ec not in TOS_SERVER_NOT_RETRYABLE_CONFLICT_ERROR_CODES
 
     return e.status_code in TOS_SERVER_RETRYABLE_STATUS_CODES
 

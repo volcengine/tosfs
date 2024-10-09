@@ -71,6 +71,7 @@ ignore = [
     "D213", # multi-line-summary-second-line
     "PLR0913", # Too many arguments in function definition
     "SIM105", # Use `contextlib.suppress(IOError)` instead of `try`-`except`-`pass`
+    "SIM117", # Use a single `with` statement with multiple contexts instead of nested `with` statements
     "PERF203", # `try`-`except` within a loop incurs performance overhead
     "PLR1714", # Consider merging multiple comparisons. Use a `set` if the elements are hashable
 ]

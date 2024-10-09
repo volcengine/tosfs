@@ -32,13 +32,11 @@ from tos.models2 import (
     ListedObject,
     ListedObjectVersion,
     ListObjectType2Output,
-    ListObjectVersionsOutput,
     PartInfo,
     UploadPartCopyOutput,
 )
 
 from tosfs.consts import (
-    APPEND_OPERATION_SMALL_FILE_THRESHOLD,
     ENV_NAME_TOS_BUCKET_TAG_ENABLE,
     ENV_NAME_TOS_SDK_LOGGING_LEVEL,
     ENV_NAME_TOSFS_LOGGING_LEVEL,
@@ -321,7 +319,7 @@ class TosFileSystem(AbstractFileSystem):
         if fill_cache is None:
             fill_cache = self.default_fill_cache
 
-        if not self.version_aware and version_id:
+        if version_id:
             raise ValueError(
                 "version_id cannot be specified if the filesystem "
                 "is not version aware"
@@ -436,7 +434,7 @@ class TosFileSystem(AbstractFileSystem):
             If versions is specified but the filesystem is not version aware.
 
         """
-        if versions and not self.version_aware:
+        if versions:
             raise ValueError(
                 "versions cannot be specified if the filesystem "
                 "is not version aware."
@@ -511,7 +509,7 @@ class TosFileSystem(AbstractFileSystem):
         bucket, key, path_version_id = self._split_path(path)
         fullpath = "/".join((bucket, key))
 
-        if version_id is not None and not self.version_aware:
+        if version_id:
             raise ValueError(
                 "version_id cannot be specified due to the "
                 "filesystem is not support version aware."
@@ -1237,6 +1235,10 @@ class TosFileSystem(AbstractFileSystem):
             If there is an unknown error while copying the file.
 
         """
+        if path1 == path2:
+            logger.warning("Source and destination are the same: %s", path1)
+            return
+
         path1 = self._strip_protocol(path1)
         bucket, key, vers = self._split_path(path1)
 
@@ -1906,7 +1908,7 @@ class TosFileSystem(AbstractFileSystem):
         include_self: bool = False,
         versions: bool = False,
     ) -> List[Union[CommonPrefixInfo, ListedObject, ListedObjectVersion]]:
-        if versions and not self.version_aware:
+        if versions:
             raise ValueError(
                 "versions cannot be specified if the filesystem is "
                 "not version aware."
@@ -1915,61 +1917,30 @@ class TosFileSystem(AbstractFileSystem):
         all_results = []
         is_truncated = True
 
-        if self.version_aware:
-            key_marker, version_id_marker = None, None
-            while is_truncated:
+        continuation_token = ""
+        while is_truncated:
 
-                def _call_list_object_versions(
-                    key_marker: Optional[Any] = key_marker,
-                    version_id_marker: Optional[Any] = version_id_marker,
-                ) -> ListObjectVersionsOutput:
-                    return self.tos_client.list_object_versions(
-                        bucket,
-                        prefix,
-                        delimiter=delimiter,
-                        max_keys=max_items,
-                        key_marker=key_marker,
-                        version_id_marker=version_id_marker,
-                    )
-
-                resp = retryable_func_executor(
-                    _call_list_object_versions,
-                    args=(key_marker, version_id_marker),
-                    max_retry_num=self.max_retry_num,
+            def _call_list_objects_type2(
+                continuation_token: str = continuation_token,
+            ) -> ListObjectType2Output:
+                return self.tos_client.list_objects_type2(
+                    bucket,
+                    prefix,
+                    start_after=prefix if not include_self else None,
+                    delimiter=delimiter,
+                    max_keys=max_items,
+                    continuation_token=continuation_token,
                 )
-                is_truncated = resp.is_truncated
-                all_results.extend(
-                    resp.versions + resp.common_prefixes + resp.delete_markers
-                )
-                key_marker, version_id_marker = (
-                    resp.next_key_marker,
-                    resp.next_version_id_marker,
-                )
-        else:
-            continuation_token = ""
-            while is_truncated:
 
-                def _call_list_objects_type2(
-                    continuation_token: str = continuation_token,
-                ) -> ListObjectType2Output:
-                    return self.tos_client.list_objects_type2(
-                        bucket,
-                        prefix,
-                        start_after=prefix if not include_self else None,
-                        delimiter=delimiter,
-                        max_keys=max_items,
-                        continuation_token=continuation_token,
-                    )
+            resp = retryable_func_executor(
+                _call_list_objects_type2,
+                args=(continuation_token,),
+                max_retry_num=self.max_retry_num,
+            )
+            is_truncated = resp.is_truncated
+            continuation_token = resp.next_continuation_token
 
-                resp = retryable_func_executor(
-                    _call_list_objects_type2,
-                    args=(continuation_token,),
-                    max_retry_num=self.max_retry_num,
-                )
-                is_truncated = resp.is_truncated
-                continuation_token = resp.next_continuation_token
-
-                all_results.extend(resp.contents + resp.common_prefixes)
+            all_results.extend(resp.contents + resp.common_prefixes)
 
         return all_results
 
@@ -2259,6 +2230,7 @@ class TosFile(AbstractBufferedFile):
         self.mode = mode
         self.autocommit = autocommit
         self.append_block = False
+        self.append_offset = 0
         self.buffer: Optional[io.BytesIO] = io.BytesIO()
 
         self._check_init_params(key, path, mode, block_size)
@@ -2275,18 +2247,13 @@ class TosFile(AbstractBufferedFile):
             )
 
         if "a" in mode:
+            self.append_block = True
             try:
                 head = retryable_func_executor(
                     lambda: self.fs.tos_client.head_object(bucket, key),
                     max_retry_num=self.fs.max_retry_num,
                 )
-                loc = head.content_length
-                if loc < APPEND_OPERATION_SMALL_FILE_THRESHOLD:
-                    # existing file too small for multi-upload: download
-                    self.write(self.fs.cat(self.path))
-                else:
-                    self.append_block = True
-                self.loc = loc
+                self.append_offset = head.content_length
             except TosServerError as e:
                 if e.status_code == TOS_SERVER_STATUS_CODE_NOT_FOUND:
                     pass
@@ -2315,10 +2282,11 @@ class TosFile(AbstractBufferedFile):
 
     def _initiate_upload(self) -> None:
         """Create remote file/upload."""
-        if self.autocommit and not self.append_block and self.tell() < self.blocksize:
+        if self.autocommit and self.append_block and self.tell() < self.blocksize:
             # only happens when closing small file, use on-shot PUT
             return
         logger.debug("Initiate upload for %s", self)
+        self.multipart_uploader.initiate_upload()
 
     def _upload_chunk(self, final: bool = False) -> bool:
         """Write one part of a multi-block file upload.
@@ -2340,23 +2308,40 @@ class TosFile(AbstractBufferedFile):
                 self.buffer.tell(),
             )
 
-        if (
-            self.autocommit
-            and not self.append_block
-            and final
-            and self.tell()
-            < max(self.blocksize, self.multipart_uploader.multipart_threshold)
-        ):
-            # only happens when closing small file, use one-shot PUT
-            pass
+        if self.append_block:
+            self._append_chunk()
         else:
-            self.multipart_uploader.initiate_upload()
-            self.multipart_uploader.upload_multiple_chunks(self.buffer)
+            if (
+                self.autocommit
+                and final
+                and self.tell()
+                < max(self.blocksize, self.multipart_uploader.multipart_threshold)
+            ):
+                # only happens when closing small file, use one-shot PUT
+                pass
+            else:
+                self.multipart_uploader.upload_multiple_chunks(self.buffer)
 
-        if self.autocommit and final:
-            self.commit()
+            if self.autocommit and final:
+                self.commit()
 
         return not final
+
+    def _append_chunk(self) -> None:
+        """Append or create to a file."""
+        if self.buffer:
+            self.buffer.seek(0)
+            content = self.buffer.read()
+            if content:
+                resp = retryable_func_executor(
+                    lambda: self.fs.tos_client.append_object(
+                        self.bucket,
+                        self.key,
+                        offset=self.append_offset,
+                        content=content,
+                    ),
+                )
+                self.append_offset = resp.next_append_offset
 
     def _fetch_range(self, start: int, end: int) -> bytes:
         if start == end:
@@ -2400,21 +2385,18 @@ class TosFile(AbstractBufferedFile):
                 logger.debug("One-shot upload of %s", self)
                 self.buffer.seek(0)
                 data = self.buffer.read()
-                write_result = retryable_func_executor(
+                retryable_func_executor(
                     lambda: self.fs.tos_client.put_object(
                         self.bucket, self.key, content=data
                     ),
                     max_retry_num=self.fs.max_retry_num,
                 )
             else:
-                raise RuntimeError
+                raise RuntimeError("No buffer to commit for file %s" % self.path)
         else:
             logger.debug("Complete multi-part upload for %s ", self)
-            self.multipart_uploader._upload_staged_files()
+            self.multipart_uploader.upload_staged_files()
             self.multipart_uploader.complete_upload()
-
-        if self.fs.version_aware:
-            self.version_id = write_result.version_id
 
         self.buffer = None
 
