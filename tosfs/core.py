@@ -46,6 +46,7 @@ from tosfs.consts import (
     MANAGED_COPY_MAX_THRESHOLD,
     MANAGED_COPY_MIN_THRESHOLD,
     MPU_PART_SIZE_THRESHOLD,
+    PART_MAX_SIZE,
     PUT_OBJECT_OPERATION_SMALL_FILE_THRESHOLD,
     TOS_SERVER_STATUS_CODE_NOT_FOUND,
     TOSFS_LOG_FORMAT,
@@ -1430,7 +1431,7 @@ class TosFileSystem(AbstractFileSystem):
         )
 
     def _copy_etag_preserved(
-            self, path1: str, path2: str, size: int, total_parts: int, **kwargs: Any
+        self, path1: str, path2: str, size: int, total_parts: int, **kwargs: Any
     ) -> None:
         """Copy file as multiple-part while preserving the etag."""
         bucket1, key1, version1 = self._split_path(path1)
@@ -1455,9 +1456,9 @@ class TosFileSystem(AbstractFileSystem):
                     brange_last = size - 1
 
                 def _call_upload_part_copy(
-                        i: int = i,
-                        brange_first: int = brange_first,
-                        brange_last: int = brange_last,
+                    i: int = i,
+                    brange_first: int = brange_first,
+                    brange_last: int = brange_last,
                 ) -> UploadPartCopyOutput:
                     return self.tos_client.upload_part_copy(
                         bucket=bucket2,
