@@ -1246,8 +1246,8 @@ class TosFileSystem(AbstractFileSystem):
         size = info["size"]
 
         _, _, parts_suffix = info.get("ETag", "").strip('"').partition("-")
-        if preserve_etag:
-            raise NotImplementedError("Preserve etag is not supported yet.")
+        if preserve_etag and parts_suffix:
+            self._copy_etag_preserved(path1, path2, size, total_parts=int(parts_suffix))
         elif size <= min(
             MANAGED_COPY_MAX_THRESHOLD,
             (
@@ -1428,6 +1428,79 @@ class TosFileSystem(AbstractFileSystem):
             ),
             max_retry_num=self.max_retry_num,
         )
+
+    def _copy_etag_preserved(
+            self, path1: str, path2: str, size: int, total_parts: int, **kwargs: Any
+    ) -> None:
+        """Copy file as multiple-part while preserving the etag."""
+        bucket1, key1, version1 = self._split_path(path1)
+        bucket2, key2, version2 = self._split_path(path2)
+
+        upload_id = None
+
+        try:
+            mpu = retryable_func_executor(
+                lambda: self.tos_client.create_multipart_upload(bucket2, key2),
+                max_retry_num=self.max_retry_num,
+            )
+            upload_id = mpu.upload_id
+
+            parts = []
+            brange_first = 0
+
+            for i in range(1, total_parts + 1):
+                part_size = min(size - brange_first, PART_MAX_SIZE)
+                brange_last = brange_first + part_size - 1
+                if brange_last > size:
+                    brange_last = size - 1
+
+                def _call_upload_part_copy(
+                        i: int = i,
+                        brange_first: int = brange_first,
+                        brange_last: int = brange_last,
+                ) -> UploadPartCopyOutput:
+                    return self.tos_client.upload_part_copy(
+                        bucket=bucket2,
+                        key=key2,
+                        part_number=i,
+                        upload_id=upload_id,
+                        src_bucket=bucket1,
+                        src_key=key1,
+                        copy_source_range_start=brange_first,
+                        copy_source_range_end=brange_last,
+                    )
+
+                part = retryable_func_executor(
+                    _call_upload_part_copy,
+                    args=(i, brange_first, brange_last),
+                    max_retry_num=self.max_retry_num,
+                )
+                parts.append(
+                    PartInfo(
+                        part_number=part.part_number,
+                        etag=part.etag,
+                        part_size=size,
+                        offset=None,
+                        hash_crc64_ecma=None,
+                        is_completed=None,
+                    )
+                )
+                brange_first += part_size
+
+            retryable_func_executor(
+                lambda: self.tos_client.complete_multipart_upload(
+                    bucket2, key2, upload_id, parts
+                ),
+                max_retry_num=self.max_retry_num,
+            )
+        except Exception as e:
+            retryable_func_executor(
+                lambda: self.tos_client.abort_multipart_upload(
+                    bucket2, key2, upload_id
+                ),
+                max_retry_num=self.max_retry_num,
+            )
+            raise TosfsError(f"Copy failed ({path1} -> {path2}): {e}") from e
 
     def _copy_managed(
         self,
