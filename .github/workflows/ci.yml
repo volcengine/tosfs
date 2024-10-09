@@ -24,6 +24,7 @@ on:
       - 'LICENSE'
       - '.github/ISSUE_TEMPLATE/**'
       - '.gitignore'
+      - 'docs/**'
 
 jobs:
   build:
