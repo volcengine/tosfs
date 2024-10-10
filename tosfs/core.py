@@ -212,7 +212,7 @@ class TosFileSystem(AbstractFileSystem):
         proxy_password : str, optional
             The password to use when connecting to the proxy server.
         disable_encoding_meta : bool, optional
-            Whether to encode user-defined metadata x-tos-meta- */Content-Disposition,
+            Whether to encode user-defined metadata x-tos-meta- Content-Disposition,
             default encoding, no encoding when set to true.
         except100_continue_threshold : int
             When it is greater than 0, it means that the interface related to the

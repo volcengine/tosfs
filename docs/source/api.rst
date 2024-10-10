@@ -11,3 +11,4 @@ Base Classes
 
 .. autoclass:: tosfs.core.TosFileSystem
    :members:
+   :special-members: __init__
