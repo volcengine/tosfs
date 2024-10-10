@@ -12,6 +12,13 @@
 
 TOSFS builds on [Volcengine TOS Python SDK](https://github.com/volcengine/ve-tos-python-sdk) to provide a convenient Python filesystem interface for [TOS（Tinder Object Storage）](https://www.volcengine.com/docs/6349/74820).
 
+## Features
+
+* Excellent write performance (optimized by multi-threading and multi-disk staging).
+* Solid stability (fine-grained judgment on response codes for TOS services).
+* Outstanding compatibility (cross-validation completed on the version matrix of four Python versions and two fsspec versions).
+* TOS HNS (Hierarchical NameSpace) Bucket support (in adaptation and verification).
+
 ## Installation(TODO)
 
 You can install tosfs via [pip](https://pip.pypa.io/) from [PyPI](https://pypi.org/):
