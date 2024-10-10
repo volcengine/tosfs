@@ -18,6 +18,7 @@ on:
   push:
     paths-ignore:
       - '*.md'
+      - 'README.md'
       - 'pyproject.toml'
       - 'poetry.lock'
       - 'Makefile'
