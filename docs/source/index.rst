@@ -16,14 +16,17 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-tosfs documentation
-===================
+``tosfs``: Pythonic file-system interface for TOS（Tinder Object Storage）
+==========================================================================
 
-Add your content using ``reStructuredText`` syntax. See the
-`reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
-documentation for details.
+Filesystem Spec (``fsspec``) is a project to provide a unified pythonic interface to
+local, remote and embedded file systems and bytes storage.
 
+TOSFS builds on `Volcengine TOS Python SDK <https://github.com/volcengine/ve-tos-python-sdk>`_ to provide a convenient Python filesystem
+interface for `TOS <https://www.volcengine.com/docs/6349/74820>`_.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Contents:
+
+   api.rst
