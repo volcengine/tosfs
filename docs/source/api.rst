@@ -11,7 +11,3 @@ Base Classes
 
 .. autoclass:: tosfs.core.TosFileSystem
    :members:
-
-.. _implementations:
-
-.. raw:: html
