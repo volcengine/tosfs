@@ -189,12 +189,12 @@ class TosFileSystem(AbstractFileSystem):
             The max byte size which will buffer the staging data in-memory before
             flushing to the staging file. It will decrease the random write in local
             staging disk dramatically if writing plenty of small files.
-            (default is 4096).
+            default is 4096.
         multipart_threshold : int, optional
             The threshold which control whether enable multipart upload during
             writing data to the given object storage, if the write data size is less
             than threshold, will write data via simple put instead of multipart upload.
-             (default is 10 MB).
+            default is 10 MB.
         enable_crc : bool
             Whether to enable client side CRC check after upload, default is true
         enable_verify_ssl : bool
