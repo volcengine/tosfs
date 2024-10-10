@@ -25,6 +25,7 @@ on:
       - '.github/ISSUE_TEMPLATE/**'
       - '.gitignore'
       - 'docs/**'
+      - 'examples/**'
 
 jobs:
   build:
