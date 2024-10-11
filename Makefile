@@ -77,8 +77,9 @@ clean:            ## Clean unused files.
 .PHONY: release
 release:          ## Create a new tag for release.
 	@echo "WARNING: This operation will create s version tag and push to github"
-	@read -p "Version? (provide the next x.y.z semver) : " TAG; \
-	git checkout -b $${TAG}; \
+	@set -e; \
+	read -p "Version? (provide the next x.y.z semver) : " TAG; \
+	git checkout -b release-$${TAG}; \
 	echo "$${TAG}" > tosfs/VERSION; \
 	git log --pretty=format:"%h - %s (%an, %ad)" --date=short > HISTORY.md; \
 	git add tosfs/VERSION HISTORY.md; \
