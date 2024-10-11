@@ -2,7 +2,7 @@
 name = "tosfs"
 version = "2024.10.0"
 description = "tosfs is a Pythonic file-system interface for TOS（Tinder Object Storage）."
-authors = ["yanghua@bytedance.com>"]
+authors = ["Vino Yang <yanghua@bytedance.com>"]
 license = "Apache License"
 readme = "README.md"
 
