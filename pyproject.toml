@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "tosfs"
-version = "0.1.0"
-description = "tosfs is a tos Python client that implements the fsspec interface."
-authors = ["Your Name <you@example.com>"]
+version = "2024.10.0"
+description = "tosfs is a Pythonic file-system interface for TOS（Tinder Object Storage）."
+authors = ["yanghua@bytedance.com>"]
 license = "Apache License"
 readme = "README.md"
 
@@ -10,7 +10,7 @@ readme = "README.md"
 python = "^3.9"
 fsspec = ">=2023.5.0"
 tos = ">=2.7.0"
-volcengine= "==1.0.154"
+volcengine= ">=1.0.154"
 
 [tool.poetry.group.dev.dependencies]
 fsspec = ">=2023.5.0"
