@@ -72,7 +72,7 @@ clean:            ## Clean unused files.
 	@rm -rf *.egg-info
 	@rm -rf htmlcov
 	@rm -rf .tox/
-	@rm -rf docs/_build
+	@rm -rf docs/build
 
 .PHONY: release
 release:          ## Create a new tag for release.
@@ -82,7 +82,8 @@ release:          ## Create a new tag for release.
 	git checkout -b release-$${TAG}; \
 	echo "$${TAG}" > tosfs/VERSION; \
 	git log --pretty=format:"%h - %s (%an, %ad)" --date=short > HISTORY.md; \
-	git add tosfs/VERSION HISTORY.md; \
+	poetry version $${TAG}; \
+	git add tosfs/VERSION HISTORY.md pyproject.toml; \
 	git commit -m "release: version $${TAG} 🚀"; \
 	echo "creating git tag : $${TAG}"; \
 	git tag $${TAG}; \
