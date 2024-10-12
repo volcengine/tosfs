@@ -521,10 +521,18 @@ class TosFileSystem(AbstractFileSystem):
         if not key:
             return self._bucket_info(bucket)
 
-        if info := self._object_info(bucket, key, version_id):
-            return info
+        bucket_type = self._get_bucket_type(bucket)
+        if bucket_type == TOS_BUCKET_TYPE_FNS:
+            if info := self._object_info(bucket, key, version_id):
+                return info
 
-        return self._get_dir_info(bucket, key, path, fullpath)
+            return self._get_dir_info(bucket, key, path, fullpath)
+        else:
+            # Priority is given to judging dir, followed by file.
+            if info := self._get_dir_info(bucket, key, path, fullpath):
+                return info
+
+            return self._object_info(bucket, key, version_id)
 
     def exists(self, path: str, **kwargs: Any) -> bool:
         """Check if a path exists in the TOS.
@@ -828,9 +836,8 @@ class TosFileSystem(AbstractFileSystem):
         except TosClientError as e:
             raise e
         except TosServerError as e:
-            if (
-                e.status_code == TOS_SERVER_STATUS_CODE_NOT_FOUND
-                or self._get_bucket_type(bucket) == TOS_BUCKET_TYPE_HNS
+            if e.status_code == TOS_SERVER_STATUS_CODE_NOT_FOUND or (
+                self._get_bucket_type(bucket) == TOS_BUCKET_TYPE_HNS
                 and e.status_code == CONFLICT_CODE
                 and e.header._store["x-tos-ec"][1] == "0026-00000020"
             ):
@@ -1818,7 +1825,11 @@ class TosFileSystem(AbstractFileSystem):
         except TosClientError as e:
             raise e
         except TosServerError as e:
-            if e.status_code == TOS_SERVER_STATUS_CODE_NOT_FOUND:
+            if e.status_code == TOS_SERVER_STATUS_CODE_NOT_FOUND or (
+                self._get_bucket_type(bucket) == TOS_BUCKET_TYPE_HNS
+                and e.status_code == CONFLICT_CODE
+                and e.header._store["x-tos-ec"][1] == "0026-00000020"
+            ):
                 pass
             else:
                 raise e
@@ -1850,8 +1861,8 @@ class TosFileSystem(AbstractFileSystem):
                     "type": "directory",
                 }
 
-            raise FileNotFoundError(path)
-        except (TosClientError, TosServerError, FileNotFoundError) as e:
+            return {}
+        except (TosClientError, TosServerError) as e:
             raise e
         except Exception as e:
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
