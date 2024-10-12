@@ -112,7 +112,8 @@ def test_info(fsspecfs: Any, bucket: str, temporary_workspace: str):
     # Some FS might not support 'size' for directories, so it's not strictly checked
 
     # Test non-existent path
-    fsspecfs.info(f"{bucket}/{temporary_workspace}/non_existent")
+    with pytest.raises(FileNotFoundError):
+        fsspecfs.info(f"{bucket}/{temporary_workspace}/non_existent")
 
     # Test protocol stripping
     protocol_included_path = fsspecfs._strip_protocol(file_path)

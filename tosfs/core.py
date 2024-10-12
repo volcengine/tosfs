@@ -523,16 +523,21 @@ class TosFileSystem(AbstractFileSystem):
 
         bucket_type = self._get_bucket_type(bucket)
         if bucket_type == TOS_BUCKET_TYPE_FNS:
-            if info := self._object_info(bucket, key, version_id):
-                return info
+            result = self._object_info(bucket, key, version_id)
 
-            return self._get_dir_info(bucket, key, path, fullpath)
+            if not result:
+                result = self._get_dir_info(bucket, key, fullpath)
         else:
             # Priority is given to judging dir, followed by file.
-            if info := self._get_dir_info(bucket, key, path, fullpath):
-                return info
+            result = self._get_dir_info(bucket, key, fullpath)
 
-            return self._object_info(bucket, key, version_id)
+            if not result:
+                result =  self._object_info(bucket, key, version_id)
+
+        if not result:
+            raise FileNotFoundError(f"Can not get information for path: {path}")
+
+        return result
 
     def exists(self, path: str, **kwargs: Any) -> bool:
         """Check if a path exists in the TOS.
@@ -1253,6 +1258,9 @@ class TosFileSystem(AbstractFileSystem):
         bucket, key, vers = self._split_path(path1)
 
         info = self.info(path1, bucket, key, version_id=vers)
+        if not info:
+            raise FileNotFoundError(f"Can not get information for path: {path1}")
+
         if info["type"] == "directory":
             logger.warning("Do not support copy directory %s.", path1)
             return
@@ -1680,6 +1688,7 @@ class TosFileSystem(AbstractFileSystem):
                 out = [self.info(path)]
             except FileNotFoundError:
                 out = []
+
         dirs = {
             self._parent(o["name"]): {
                 "Key": self._parent(o["name"]).rstrip("/"),
@@ -1772,7 +1781,7 @@ class TosFileSystem(AbstractFileSystem):
 
     def _object_info(
         self, bucket: str, key: str, version_id: Optional[str] = None
-    ) -> dict:
+    ) -> Optional[dict]:
         """Get the information of an object.
 
         Parameters
@@ -1836,9 +1845,9 @@ class TosFileSystem(AbstractFileSystem):
         except Exception as e:
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
 
-        return {}
+        return None
 
-    def _get_dir_info(self, bucket: str, key: str, path: str, fullpath: str) -> dict:
+    def _get_dir_info(self, bucket: str, key: str, fullpath: str) -> Optional[dict]:
         try:
             # We check to see if the path is a directory by attempting to list its
             # contexts. If anything is found, it is indeed a directory
@@ -1861,7 +1870,7 @@ class TosFileSystem(AbstractFileSystem):
                     "type": "directory",
                 }
 
-            return {}
+            return None
         except (TosClientError, TosServerError) as e:
             raise e
         except Exception as e:
