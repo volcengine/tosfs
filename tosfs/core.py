@@ -1691,7 +1691,7 @@ class TosFileSystem(AbstractFileSystem):
         self, key: str, path: str, prefix: str, withdirs: bool, kwargs: Any
     ) -> List[dict]:
         out = self._ls_dirs_and_files(
-            path, delimiter="", include_self=True, prefix=prefix, **kwargs
+            path, delimiter="", include_self=True, prefix=prefix, recursive=True,
         )
         if not out and key:
             try:
@@ -1977,6 +1977,7 @@ class TosFileSystem(AbstractFileSystem):
         prefix: str = "",
         include_self: bool = False,
         versions: bool = False,
+        recursive: bool = False,
     ) -> List[dict]:
         bucket, key, _ = self._split_path(path)
         if not prefix:
@@ -1994,6 +1995,7 @@ class TosFileSystem(AbstractFileSystem):
             prefix=prefix,
             include_self=include_self,
             versions=versions,
+            recursive=recursive,
         ):
             if isinstance(obj, CommonPrefixInfo) and delimiter == "/":
                 dirs.append(self._fill_dir_info(bucket, obj))
@@ -2013,6 +2015,7 @@ class TosFileSystem(AbstractFileSystem):
         prefix: str = "",
         include_self: bool = False,
         versions: bool = False,
+        recursive: bool = False,
     ) -> List[Union[CommonPrefixInfo, ListedObject, ListedObjectVersion]]:
         if versions:
             raise ValueError(
@@ -2020,55 +2023,59 @@ class TosFileSystem(AbstractFileSystem):
                 "not version aware."
             )
 
-        # bucket_type = self._get_bucket_type(bucket)
+        bucket_type = self._get_bucket_type(bucket)
         all_results = []
 
-        is_truncated = True
-
-        continuation_token = ""
-        while is_truncated:
-
-            def _call_list_objects_type2(
-                continuation_token: str = continuation_token,
-            ) -> ListObjectType2Output:
-                return self.tos_client.list_objects_type2(
-                    bucket,
-                    prefix,
-                    start_after=prefix if not include_self else None,
-                    delimiter=delimiter,
-                    max_keys=max_items,
-                    continuation_token=continuation_token,
+        if recursive and bucket_type == TOS_BUCKET_TYPE_HNS:
+            def _recursive_list(bucket: str, prefix: str) -> None:
+                resp = retryable_func_executor(
+                    lambda: self.tos_client.list_objects_type2(
+                        bucket,
+                        prefix=prefix,
+                        delimiter="/",
+                        max_keys=max_items,
+                    ),
+                    max_retry_num=self.max_retry_num,
                 )
 
-            resp = retryable_func_executor(
-                _call_list_objects_type2,
-                args=(continuation_token,),
-                max_retry_num=self.max_retry_num,
-            )
-            is_truncated = resp.is_truncated
-            continuation_token = resp.next_continuation_token
+                all_results.extend(resp.contents + resp.common_prefixes)
+                for common_prefix in resp.common_prefixes:
+                    _recursive_list(bucket, common_prefix.prefix)
 
-            all_results.extend(resp.contents + resp.common_prefixes)
+            _recursive_list(bucket, prefix)
+        else:
+            is_truncated = True
+
+            continuation_token = ""
+            while is_truncated:
+
+                def _call_list_objects_type2(
+                    continuation_token: str = continuation_token,
+                ) -> ListObjectType2Output:
+                    return self.tos_client.list_objects_type2(
+                        bucket,
+                        prefix,
+                        start_after=prefix if not include_self else None,
+                        delimiter=delimiter,
+                        max_keys=max_items,
+                        continuation_token=continuation_token,
+                    )
+
+                resp = retryable_func_executor(
+                    _call_list_objects_type2,
+                    args=(continuation_token,),
+                    max_retry_num=self.max_retry_num,
+                )
+                is_truncated = resp.is_truncated
+                continuation_token = resp.next_continuation_token
+
+                all_results.extend(resp.contents + resp.common_prefixes)
 
         # if bucket_type == TOS_BUCKET_TYPE_FNS:
         #
         # elif bucket_type == TOS_BUCKET_TYPE_HNS:
         #
-        #     def _recursive_list(bucket: str, prefix: str) -> None:
-        #         resp = retryable_func_executor(
-        #             lambda: self.tos_client.list_objects_type2(
-        #                 bucket,
-        #                 prefix=prefix,
-        #                 delimiter="/",
-        #                 max_keys=max_items,
-        #             ),
-        #             max_retry_num=self.max_retry_num,
-        #         )
-        #         all_results.extend(resp.contents + resp.common_prefixes)
-        #         for common_prefix in resp.common_prefixes:
-        #             _recursive_list(bucket, common_prefix.prefix)
-        #
-        #     _recursive_list(bucket, prefix)
+
         # else:
         #     raise ValueError(f"Unsupported bucket type: {bucket_type}")
 
