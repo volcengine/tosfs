@@ -533,7 +533,7 @@ class TosFileSystem(AbstractFileSystem):
             result = self._get_dir_info(bucket, key, fullpath)
 
             if not result:
-                result =  self._object_info(bucket, key, version_id)
+                result = self._object_info(bucket, key, version_id)
 
         if not result:
             raise FileNotFoundError(f"Can not get information for path: {path}")
