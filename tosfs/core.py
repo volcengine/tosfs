@@ -1399,15 +1399,24 @@ class TosFileSystem(AbstractFileSystem):
     def _delete_objects(
         self, bucket: str, deleting_objects: list[DeletingObject]
     ) -> None:
-        delete_resp = retryable_func_executor(
-            lambda: self.tos_client.delete_multi_objects(
-                bucket, deleting_objects, quiet=True
-            ),
-            max_retry_num=self.max_retry_num,
-        )
-        if delete_resp.error:
-            for d in delete_resp.error:
-                logger.warning("Deleted object: %s failed", d)
+        bucket_type = self._get_bucket_type(bucket)
+        if bucket_type == TOS_BUCKET_TYPE_FNS:
+            delete_resp = retryable_func_executor(
+                lambda: self.tos_client.delete_multi_objects(
+                    bucket, deleting_objects, quiet=True
+                ),
+                max_retry_num=self.max_retry_num,
+            )
+            if delete_resp.error:
+                for d in delete_resp.error:
+                    logger.warning("Deleted object: %s failed", d)
+        else:
+            for obj in deleting_objects:
+                retryable_func_executor(
+                    lambda: self.tos_client.delete_object(bucket, obj.key),
+                    max_retry_num=self.max_retry_num,
+                )
+
 
     def _list_and_collect_objects(
         self, bucket: str, bucket_type: str, prefix: str
