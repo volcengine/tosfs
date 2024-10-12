@@ -1421,12 +1421,15 @@ class TosFileSystem(AbstractFileSystem):
                 for d in delete_resp.error:
                     logger.warning("Deleted object: %s failed", d)
         else:
-            for obj in deleting_objects:
+
+            def _call_delete_object(obj: DeletingObject) -> None:
                 retryable_func_executor(
                     lambda: self.tos_client.delete_object(bucket, obj.key),
                     max_retry_num=self.max_retry_num,
                 )
 
+            for obj in deleting_objects:
+                _call_delete_object(obj)
 
     def _list_and_collect_objects(
         self, bucket: str, bucket_type: str, prefix: str
