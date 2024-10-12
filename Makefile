@@ -72,20 +72,23 @@ clean:            ## Clean unused files.
 	@rm -rf *.egg-info
 	@rm -rf htmlcov
 	@rm -rf .tox/
-	@rm -rf docs/_build
+	@rm -rf docs/build
 
 .PHONY: release
 release:          ## Create a new tag for release.
 	@echo "WARNING: This operation will create s version tag and push to github"
-	@read -p "Version? (provide the next x.y.z semver) : " TAG
-	@echo "$${TAG}" > tosfs/VERSION
-	@$(ENV_PREFIX)gitchangelog > HISTORY.md
-	@git add tosfs/VERSION HISTORY.md
-	@git commit -m "release: version $${TAG} 🚀"
-	@echo "creating git tag : $${TAG}"
-	@git tag $${TAG}
-	@git push -u origin HEAD --tags
-	@echo "Github Actions will detect the new tag and release the new version."
+	@set -e; \
+	read -p "Version? (provide the next x.y.z semver) : " TAG; \
+	git checkout -b release-$${TAG}; \
+	echo "$${TAG}" > tosfs/VERSION; \
+	git log --pretty=format:"%h - %s (%an, %ad)" --date=short > HISTORY.md; \
+	poetry version $${TAG}; \
+	git add tosfs/VERSION HISTORY.md pyproject.toml; \
+	git commit -m "release: version $${TAG} 🚀"; \
+	echo "creating git tag : $${TAG}"; \
+	git tag $${TAG}; \
+	git push -u origin HEAD --tags; \
+	echo "Github Actions will detect the new tag and release the new version."
 
 .PHONY: docs
 docs:             ## Build the documentation.
