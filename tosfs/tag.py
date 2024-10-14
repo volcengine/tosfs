@@ -29,7 +29,6 @@ from volcengine.Credentials import Credentials
 from volcengine.ServiceInfo import ServiceInfo
 
 from tosfs.consts import ENV_NAME_VOLC_REGION
-from tosfs.core import logger
 
 PUT_TAG_ACTION_NAME = "PutBucketDoubleMeterTagging"
 GET_TAG_ACTION_NAME = "GetBucketTagging"
@@ -224,6 +223,7 @@ class BucketTagMgr:
 
         actual_region = os.environ.get(ENV_NAME_VOLC_REGION)
         if actual_region:
+            from tosfs.core import logger
             logger.debug(
                 f"Get the region from {ENV_NAME_VOLC_REGION} env, "
                 f"value: {actual_region}."
