@@ -224,6 +224,7 @@ class BucketTagMgr:
         actual_region = os.environ.get(ENV_NAME_VOLC_REGION)
         if actual_region:
             from tosfs.core import logger
+
             logger.debug(
                 f"Get the region from {ENV_NAME_VOLC_REGION} env, "
                 f"value: {actual_region}."
