@@ -28,6 +28,8 @@ from volcengine.base.Service import Service
 from volcengine.Credentials import Credentials
 from volcengine.ServiceInfo import ServiceInfo
 
+from tosfs.consts import ENV_NAME_VOLC_REGION
+
 PUT_TAG_ACTION_NAME = "PutBucketDoubleMeterTagging"
 GET_TAG_ACTION_NAME = "GetBucketTagging"
 EMR_OPEN_API_VERSION = "2022-12-29"
@@ -218,8 +220,20 @@ class BucketTagMgr:
         self.secret = secret
         self.session_token = session_token
         self.region = region
+
+        actual_region = os.environ.get(ENV_NAME_VOLC_REGION)
+        if actual_region:
+            from tosfs.core import logger
+
+            logger.debug(
+                f"Get the region from {ENV_NAME_VOLC_REGION} env, "
+                f"value: {actual_region}."
+            )
+        else:
+            actual_region = self.region
+
         self.bucket_tag_service = BucketTagAction(
-            self.key, self.secret, self.session_token, self.region
+            self.key, self.secret, self.session_token, actual_region
         )
 
     def add_bucket_tag(self, bucket: str) -> None:
