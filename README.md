@@ -117,6 +117,18 @@ Distributed under the terms of the [Apache 2.0 license](https://github.com/volce
 ## Issues
 If you encounter any problems, please [file an issue](https://github.com/volcengine/tosfs/issues/new/choose) along with a detailed description.
 
+## Privacy Statement
+Welcome to our open-source project [tosfs](https://github.com/volcengine/tosfs). We highly value your privacy and are committed to protecting your information. This privacy statement aims to inform you about how we collect, use, store, and protect your information within the project (we believe you have the right to know).
+
+__Information Collection__: We may collect the names of the buckets you access in the TOS service (and only the names of the buckets you access). You can opt out of this collection by setting the environment variable "**TOS_BUCKET_TAG_ENABLE**" to "**false**," and we will respect your decision.
+
+__Information Usage__: We will only use the collected information to tag the source of access and commit that this information will solely be used for the purpose of tagging the source of access.
+
+__Information Storage__: We will take reasonable security measures to protect the information we collect from unauthorized access, disclosure, use, or destruction. We commit that this information will not be stored on third-party service providers' servers. Additionally, we will comply with applicable laws, regulations, and security standards.
+
+__Information Sharing__: We will not sell, rent, or share the collected information with any third parties.
+
+If you need any further adjustments or additional details, feel free to let us know!
 
 
 
