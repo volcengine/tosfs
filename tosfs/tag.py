@@ -155,6 +155,9 @@ class BucketTagAction(Service):
         """Get service info."""
         service_info = service_info_map.get(region)
         if service_info:
+            from tosfs.core import logger
+
+            logger.debug(f"The service name is : {service_info.credentials.service}")
             return service_info
 
         raise Exception(f"Do not support region: {region}")
@@ -238,6 +241,9 @@ class BucketTagMgr:
 
     def add_bucket_tag(self, bucket: str) -> None:
         """Add tag for bucket."""
+        from tosfs.core import logger
+
+        logger.debug(f"Trigger add_bucket_tag: {bucket}")
         collect_bucket_set = {bucket}
 
         if not collect_bucket_set - self.cached_bucket_set:
@@ -246,9 +252,16 @@ class BucketTagMgr:
         if os.path.exists(TAGGED_BUCKETS_FILE):
             with open(TAGGED_BUCKETS_FILE, "r") as file:
                 tagged_bucket_from_file_set = set(file.read().split(" "))
+                from tosfs.core import logger
+
+                logger.debug(
+                    f"Marked tagged buckets in the file are: "
+                    f"{tagged_bucket_from_file_set}"
+                )
             self.cached_bucket_set |= tagged_bucket_from_file_set
 
         need_tag_buckets = collect_bucket_set - self.cached_bucket_set
+        logger.debug(f"Need to tag buckets are: {need_tag_buckets}")
 
         for res in self.executor.map(
             self.bucket_tag_service.put_bucket_tag, need_tag_buckets
