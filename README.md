@@ -118,7 +118,7 @@ Distributed under the terms of the [Apache 2.0 license](https://github.com/volce
 If you encounter any problems, please [file an issue](https://github.com/volcengine/tosfs/issues/new/choose) along with a detailed description.
 
 ## Privacy Statement
-Welcome to our open-source project [tosfs](https://github.com/volcengine/tosfs). We highly value your privacy and are committed to protecting your information. This privacy statement aims to inform you about how we collect, use, store, and protect your information within the project (we believe you have the right to know).
+Welcome to use our open-source project [tosfs](https://github.com/volcengine/tosfs). We highly value your privacy and are committed to protecting your information. This privacy statement aims to inform you about how we collect, use, store, and protect your information within the project (we believe you have the right to know).
 
 __Information Collection__: We may collect the names of the buckets you access in the TOS service (and only the names of the buckets you access). You can opt out of this collection by setting the environment variable "**TOS_BUCKET_TAG_ENABLE**" to "**false**," and we will respect your decision.
 
