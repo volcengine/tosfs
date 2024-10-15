@@ -129,6 +129,3 @@ __Information Storage__: We will take reasonable security measures to protect th
 __Information Sharing__: We will not sell, rent, or share the collected information with any third parties.
 
 If you need any further adjustments or additional details, feel free to let us know!
-
-
-
