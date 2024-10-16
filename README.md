@@ -19,7 +19,7 @@ TOSFS builds on [Volcengine TOS Python SDK](https://github.com/volcengine/ve-tos
 * Outstanding compatibility (cross-validation completed on the version matrix of four Python versions and two fsspec versions).
 * TOS HNS (Hierarchical NameSpace) Bucket support (in adaptation and verification).
 
-## Installation(TODO)
+## Installation
 
 You can install tosfs via [pip](https://pip.pypa.io/) from [PyPI](https://pypi.org/):
 
