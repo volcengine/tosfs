@@ -601,6 +601,11 @@ class TosFileSystem(AbstractFileSystem):
         except Exception as ex:
             raise TosfsError(f"Tosfs failed with unknown error: {ex}") from ex
 
+    def rm_file(self, path: str) -> None:
+        """Delete a file."""
+        logger.warning("Call rm_file api: path %s", path)
+        super().rm_file(path)
+
     def rmdir(self, path: str) -> None:
         """Remove a directory if it is empty.
 
@@ -626,6 +631,7 @@ class TosFileSystem(AbstractFileSystem):
         >>> fs.rmdir("tos://mybucket/mydir/")
 
         """
+        logger.warning("Call rmdir api: path %s", path)
         path = self._strip_protocol(path).rstrip("/") + "/"
         bucket, key, _ = self._split_path(path)
         if not key:
@@ -663,6 +669,9 @@ class TosFileSystem(AbstractFileSystem):
             possible.
 
         """
+        logger.warning(
+            "Call rm api: path %s, recursive %s, maxdepth %s", path, recursive, maxdepth
+        )
         if isinstance(path, str):
             if not self.exists(path):
                 raise FileNotFoundError(path)
