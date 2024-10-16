@@ -17,7 +17,7 @@ import tempfile
 import pytest
 from tos.exceptions import TosServerError
 
-from tosfs.core import TosFileSystem
+from tosfs import TosFileSystem
 from tosfs.exceptions import TosfsError
 from tosfs.utils import create_temp_dir, random_str
 
