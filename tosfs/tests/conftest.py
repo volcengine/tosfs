@@ -49,7 +49,7 @@ def tosfs(_tosfs_env_prepare: None) -> TosFileSystem:
 
 @pytest.fixture(scope="module")
 def fsspecfs(_tosfs_env_prepare: None) -> Any:
-    known_implementations["tos"] = {"class": "tosfs.core.TosFileSystem"}
+    known_implementations["tos"] = {"class": "tosfs.TosFileSystem"}
 
     fsspecfs, _ = fsspec.core.url_to_fs(
         "tos://",
