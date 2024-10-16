@@ -65,7 +65,7 @@ def setup_logging() -> None:
     """Set up the logging configuration for TOSFS."""
     setup_logger(
         logger=logger,
-        level=os.environ.get(ENV_NAME_TOSFS_LOGGING_LEVEL, "INFO"),
+        level=os.environ.get(ENV_NAME_TOSFS_LOGGING_LEVEL, "WARNING"),
     )
 
     formatter = logging.Formatter(TOSFS_LOG_FORMAT)
