@@ -83,9 +83,10 @@ def setup_logging() -> None:
 
 setup_logging()
 
-logger.warning(
-    "The tosfs's log level is set to be %s", logging.getLevelName(logger.level)
-)
+if logger.level < logging.WARNING:
+    logger.warning(
+        "The tosfs's log level is set to be %s", logging.getLevelName(logger.level)
+    )
 
 
 class TosFileSystem(AbstractFileSystem):
