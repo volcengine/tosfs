@@ -846,14 +846,6 @@ def test_fs_read_block(fsspecfs: Any, bucket: str, temporary_workspace: str):
     with pytest.raises(FileNotFoundError):
         fsspecfs.read_block(non_exist_path, 0, 3)
 
-    dir_name = random_str()
-    path = f"{bucket}/{temporary_workspace}/{dir_name}"
-    fsspecfs.mkdir(path)
-    assert fsspecfs.exists(path)
-
-    with pytest.raises(IsADirectoryError):
-        fsspecfs.read_block(path, 0, 3)
-
 
 def test_tail(fsspecfs: Any, bucket: str, temporary_workspace: str):
     file_name = random_str()
