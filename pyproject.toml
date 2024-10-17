@@ -3,8 +3,22 @@ name = "tosfs"
 version = "2024.10.1.dev0"
 description = "tosfs is a Pythonic file-system interface for TOS（Tinder Object Storage）."
 authors = ["Vino Yang <yanghua@bytedance.com>"]
-license = "Apache License"
+license = "Apache-2.0"
 readme = "README.md"
+homepage = "https://github.com/volcengine/tosfs"
+repository = "https://github.com/volcengine/tosfs"
+documentation = "https://tosfs.readthedocs.io/en/latest/"
+keywords = ["fsspec", "tos", "volcengine"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: Apache-2.0",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
 
 [tool.poetry.dependencies]
 python = "^3.9"
