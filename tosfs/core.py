@@ -2282,9 +2282,6 @@ class TosFile(AbstractBufferedFile):
         if not key:
             raise ValueError("Attempt to open non key-like path: %s" % path)
 
-        if "r" in mode and self.fs.isdir(path):
-            raise IsADirectoryError("Can not read a directory path: %s" % path)
-
         if "r" not in mode and int(block_size) < MPU_PART_SIZE_THRESHOLD:
             raise ValueError(
                 f"Block size must be >= {MPU_PART_SIZE_THRESHOLD // (2**20)}MB."
