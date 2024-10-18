@@ -845,7 +845,7 @@ class TosFileSystem(AbstractFileSystem):
 
         try:
             resp = retryable_func_executor(
-                lambda: self.tos_client.head_object(bucket, key) and True,
+                lambda: self.tos_client.head_object(bucket, key),
                 max_retry_num=self.max_retry_num,
             )
             if self._is_fns_bucket(bucket):
