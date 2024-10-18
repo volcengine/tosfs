@@ -844,10 +844,16 @@ class TosFileSystem(AbstractFileSystem):
         key = key.rstrip("/") + "/"
 
         try:
-            return retryable_func_executor(
+            resp = retryable_func_executor(
                 lambda: self.tos_client.head_object(bucket, key) and True,
                 max_retry_num=self.max_retry_num,
             )
+            if self._is_fns_bucket(bucket):
+                return True
+            else:
+                if "x-tos-directory" not in resp.header._store:
+                    return False
+                return resp.header._store["x-tos-directory"][1].lower() == "true"
         except TosClientError as e:
             raise e
         except TosServerError as e:
@@ -884,10 +890,16 @@ class TosFileSystem(AbstractFileSystem):
             return False
 
         try:
-            return retryable_func_executor(
-                lambda: self.tos_client.head_object(bucket, key) and True,
+            resp = retryable_func_executor(
+                lambda: self.tos_client.head_object(bucket, key),
                 max_retry_num=self.max_retry_num,
             )
+            if self._is_fns_bucket(bucket):
+                return True
+            else:
+                if "x-tos-directory" not in resp.header._store:
+                    return True
+                return resp.header._store["x-tos-directory"][1].lower() != "true"
         except TosClientError as e:
             raise e
         except TosServerError as e:
@@ -2188,6 +2200,12 @@ class TosFileSystem(AbstractFileSystem):
             return TOS_BUCKET_TYPE_FNS
 
         return bucket_type
+
+    def _is_hns_bucket(self, bucket: str) -> bool:
+        return self._get_bucket_type(bucket) == TOS_BUCKET_TYPE_HNS
+
+    def _is_fns_bucket(self, bucket: str) -> bool:
+        return self._get_bucket_type(bucket) == TOS_BUCKET_TYPE_FNS
 
     def _init_tag_manager(self) -> None:
         auth = self.tos_client.auth
