@@ -90,7 +90,6 @@ class MultipartUploader:
         key: str,
         part_size: int,
         thread_pool_size: int,
-        staging_buffer_size: int,
         multipart_threshold: int,
     ):
         """Instantiate a MultipartUploader object."""
@@ -99,7 +98,6 @@ class MultipartUploader:
         self.key = key
         self.part_size = part_size
         self.thread_pool_size = thread_pool_size
-        self.staging_buffer_size = staging_buffer_size
         self.multipart_threshold = multipart_threshold
         self.executor = ThreadPoolExecutor(max_workers=self.thread_pool_size)
         self.staging_part_mgr = StagingPartMgr(
