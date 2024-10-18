@@ -819,11 +819,24 @@ def test_file_write_append(
     content = "hello world"
     with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "w") as f:
         f.write(content)
-    with pytest.raises(TosServerError):
+
+    if tosfs._is_fns_bucket(bucket):
+        with pytest.raises(TosServerError):
+            with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "a") as f:
+                f.write(content)
+    else:
         with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "a") as f:
             f.write(content)
+        assert tosfs.info(f"{bucket}/{temporary_workspace}/{file_name}")["size"] == 2 * len(
+            content
+        )
+        with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "r") as f:
+            assert f.read() == content + content
 
     another_file = random_str()
+    if tosfs._is_hns_bucket(bucket):
+        tosfs.touch(f"{bucket}/{temporary_workspace}/{another_file}")
+
     with tosfs.open(f"{bucket}/{temporary_workspace}/{another_file}", "a") as f:
         f.write(content)
     with tosfs.open(f"{bucket}/{temporary_workspace}/{another_file}", "a") as f:
