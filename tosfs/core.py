@@ -1995,29 +1995,29 @@ class TosFileSystem(AbstractFileSystem):
         seen_names = set()
 
         for obj in self._ls_objects(
-                bucket,
-                max_items=max_items,
-                delimiter=delimiter,
-                prefix=prefix,
-                include_self=include_self,
-                versions=versions,
-                recursive=recursive,
+            bucket,
+            max_items=max_items,
+            delimiter=delimiter,
+            prefix=prefix,
+            include_self=include_self,
+            versions=versions,
+            recursive=recursive,
         ):
             if isinstance(obj, CommonPrefixInfo):
                 dir_info = self._fill_dir_info(bucket, obj)
-                dir_name = dir_info['name']
+                dir_name = dir_info["name"]
                 if dir_name not in seen_names:
                     dirs.append(dir_info)
                     seen_names.add(dir_name)
             elif obj.key.endswith("/"):
                 dir_info = self._fill_dir_info(bucket, None, obj.key)
-                dir_name = dir_info['name']
+                dir_name = dir_info["name"]
                 if dir_name not in seen_names:
                     dirs.append(dir_info)
                     seen_names.add(dir_name)
             else:
                 file_info = self._fill_file_info(obj, bucket, versions)
-                file_name = file_info['name']
+                file_name = file_info["name"]
                 if file_name not in seen_names:
                     files.append(file_info)
                     seen_names.add(file_name)
