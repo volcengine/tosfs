@@ -827,9 +827,9 @@ def test_file_write_append(
     else:
         with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "a") as f:
             f.write(content)
-        assert tosfs.info(f"{bucket}/{temporary_workspace}/{file_name}")["size"] == 2 * len(
-            content
-        )
+        assert tosfs.info(f"{bucket}/{temporary_workspace}/{file_name}")[
+            "size"
+        ] == 2 * len(content)
         with tosfs.open(f"{bucket}/{temporary_workspace}/{file_name}", "r") as f:
             assert f.read() == content + content
 
