@@ -1691,7 +1691,11 @@ class TosFileSystem(AbstractFileSystem):
         self, key: str, path: str, prefix: str, withdirs: bool, kwargs: Any
     ) -> List[dict]:
         out = self._ls_dirs_and_files(
-            path, delimiter="", include_self=True, prefix=prefix, recursive=True,
+            path,
+            delimiter="",
+            include_self=True,
+            prefix=prefix,
+            recursive=True,
         )
         if not out and key:
             try:
@@ -2027,6 +2031,7 @@ class TosFileSystem(AbstractFileSystem):
         all_results = []
 
         if recursive and bucket_type == TOS_BUCKET_TYPE_HNS:
+
             def _recursive_list(bucket: str, prefix: str) -> None:
                 resp = retryable_func_executor(
                     lambda: self.tos_client.list_objects_type2(
