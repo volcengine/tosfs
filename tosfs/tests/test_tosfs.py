@@ -114,10 +114,10 @@ def test_info(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> No
     assert tosfs.info("") == {"name": "", "size": 0, "type": "directory"}
     assert tosfs.info("/") == {"name": "/", "size": 0, "type": "directory"}
     assert tosfs.info(bucket) == {
-        "Key": "proton-ci",
+        "Key": bucket,
         "Size": 0,
         "StorageClass": "BUCKET",
-        "name": "proton-ci",
+        "name": bucket,
         "size": 0,
         "type": "directory",
     }
