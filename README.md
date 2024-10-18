@@ -14,10 +14,11 @@ TOSFS builds on [Volcengine TOS Python SDK](https://github.com/volcengine/ve-tos
 
 ## Features
 
-* Excellent write performance (optimized by multi-threading and multi-disk staging).
+* Excellent read/write performance (optimized by multi-threading and multi-disk staging).
 * Solid stability (fine-grained judgment on response codes for TOS services).
 * Outstanding compatibility (cross-validation completed on the version matrix of four Python versions and two fsspec versions).
 * TOS HNS (Hierarchical NameSpace) Bucket support (in adaptation and verification).
+* Native [append API](https://www.volcengine.com/docs/6349/74863) support.
 
 ## Installation
 
