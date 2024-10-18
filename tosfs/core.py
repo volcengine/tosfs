@@ -2387,7 +2387,7 @@ class TosFile(AbstractBufferedFile):
                 logger.debug("Empty file committed %s", self)
                 self.multipart_uploader.abort_upload()
                 self.fs.touch(self.path, **self.kwargs)
-        elif not self.multipart_uploader.staging_files:
+        elif not self.multipart_uploader.staging_part_mgr.staging_files:
             if self.buffer is not None:
                 logger.debug("One-shot upload of %s", self)
                 self.buffer.seek(0)
