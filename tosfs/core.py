@@ -118,8 +118,7 @@ class TosFileSystem(AbstractFileSystem):
         multipart_staging_dirs: str = tempfile.mkdtemp(),
         multipart_size: int = 8 << 20,
         multipart_thread_pool_size: int = max(2, os.cpu_count() or 1),
-        multipart_staging_buffer_size: int = 4 << 10,
-        multipart_threshold: int = 10 << 20,
+        multipart_threshold: int = 5 << 20,
         enable_crc: bool = True,
         enable_verify_ssl: bool = True,
         dns_cache_timeout: int = 0,
@@ -186,11 +185,6 @@ class TosFileSystem(AbstractFileSystem):
         multipart_thread_pool_size : int, optional
             The size of thread pool used for uploading multipart in parallel for the
             given object storage. (default is max(2, os.cpu_count()).
-        multipart_staging_buffer_size : int, optional
-            The max byte size which will buffer the staging data in-memory before
-            flushing to the staging file. It will decrease the random write in local
-            staging disk dramatically if writing plenty of small files.
-            default is 4096.
         multipart_threshold : int, optional
             The threshold which control whether enable multipart upload during
             writing data to the given object storage, if the write data size is less
@@ -270,7 +264,6 @@ class TosFileSystem(AbstractFileSystem):
         ]
         self.multipart_size = multipart_size
         self.multipart_thread_pool_size = multipart_thread_pool_size
-        self.multipart_staging_buffer_size = multipart_staging_buffer_size
         self.multipart_threshold = multipart_threshold
 
         super().__init__(**kwargs)
@@ -2252,7 +2245,6 @@ class TosFile(AbstractBufferedFile):
                 key=key,
                 part_size=fs.multipart_size,
                 thread_pool_size=fs.multipart_thread_pool_size,
-                staging_buffer_size=fs.multipart_staging_buffer_size,
                 multipart_threshold=fs.multipart_threshold,
             )
 
@@ -2322,7 +2314,7 @@ class TosFile(AbstractBufferedFile):
                 self.autocommit
                 and final
                 and self.tell()
-                < max(self.blocksize, self.multipart_uploader.multipart_threshold)
+                < min(self.blocksize, self.multipart_uploader.multipart_threshold)
             ):
                 # only happens when closing small file, use one-shot PUT
                 pass
@@ -2387,7 +2379,7 @@ class TosFile(AbstractBufferedFile):
                 logger.debug("Empty file committed %s", self)
                 self.multipart_uploader.abort_upload()
                 self.fs.touch(self.path, **self.kwargs)
-        elif not self.multipart_uploader.staging_files:
+        elif not self.multipart_uploader.staging_part_mgr.staging_files:
             if self.buffer is not None:
                 logger.debug("One-shot upload of %s", self)
                 self.buffer.seek(0)
