@@ -243,7 +243,6 @@ class BucketTagMgr:
         """Add tag for bucket."""
         from tosfs.core import logger
 
-        logger.debug(f"Trigger add_bucket_tag: {bucket}")
         collect_bucket_set = {bucket}
 
         if not collect_bucket_set - self.cached_bucket_set:
@@ -255,13 +254,13 @@ class BucketTagMgr:
                 from tosfs.core import logger
 
                 logger.debug(
-                    f"Marked tagged buckets in the file are: "
+                    f"Marked tagged buckets in the file : "
                     f"{tagged_bucket_from_file_set}"
                 )
             self.cached_bucket_set |= tagged_bucket_from_file_set
 
         need_tag_buckets = collect_bucket_set - self.cached_bucket_set
-        logger.debug(f"Need to tag buckets are: {need_tag_buckets}")
+        logger.debug(f"Need to tag buckets : {need_tag_buckets}")
 
         for res in self.executor.map(
             self.bucket_tag_service.put_bucket_tag, need_tag_buckets
