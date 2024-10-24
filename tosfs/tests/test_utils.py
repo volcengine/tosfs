@@ -23,6 +23,8 @@ from tosfs.utils import find_bucket_key
     [
         ("bucket/key", ("bucket", "key")),
         ("bucket/", ("bucket", "")),
+        ("tos://bucket/key", ("bucket", "key")),
+        ("tos://bucket/", ("bucket", "")),
         ("/key", ("", "key")),
         ("bucket/key/with/slashes", ("bucket", "key/with/slashes")),
         ("bucket", ("bucket", "")),
