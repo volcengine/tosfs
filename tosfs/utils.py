@@ -72,6 +72,7 @@ def find_bucket_key(tos_path: str) -> Tuple[str, str]:
             r"^(?P<bucket>:tos-object-lambda:[a-z\-0-9]+:[0-9]{12}:"
             r"accesspoint[/:][a-zA-Z0-9\-]{1,63})[/:]?(?P<key>.*)$"
         ),
+        re.compile(r"^tos://(?P<bucket>[^/]+)/(?P<key>.*)$"),
     ]
     for bucket_format in bucket_format_list:
         match = bucket_format.match(tos_path)
