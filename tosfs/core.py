@@ -1017,20 +1017,8 @@ class TosFileSystem(FsspecCompatibleFS):
             body, content_length = self._open_remote_file(
                 bucket, key, version_id, range_start=0, **kwargs
             )
-            try:
-                with open(lpath, "wb") as f:
-                    retryable_func_executor(_read_chunks, args=(body, f))
-            finally:
-                try:
-                    body.close()
-                except Exception as e:
-                    logger.error(
-                        "Failed to close the body when calling "
-                        "get_file from %s to %s: %s",
-                        rpath,
-                        lpath,
-                        e,
-                    )
+            with open(lpath, "wb") as f:
+                retryable_func_executor(_read_chunks, args=(body, f))
 
         retryable_func_executor(download_file)
 
