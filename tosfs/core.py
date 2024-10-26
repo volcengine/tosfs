@@ -53,6 +53,7 @@ from tosfs.consts import (
 )
 from tosfs.exceptions import TosfsError
 from tosfs.fsspec_utils import glob_translate
+from tosfs.models import DeletingObject
 from tosfs.mpu import MultipartUploader
 from tosfs.retry import retryable_func_executor
 from tosfs.tag import BucketTagMgr
@@ -1357,11 +1358,6 @@ class TosFileSystem(FsspecCompatibleFS):
         is_truncated = True
         continuation_token = ""
         all_results = []
-
-        class DeletingObject:
-            def __init__(self, key: str, version_id: Optional[str] = None):
-                self.key = key
-                self.version_id = version_id
 
         def delete_objects(deleting_objects: List[DeletingObject]) -> None:
             delete_resp = retryable_func_executor(
