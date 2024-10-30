@@ -15,6 +15,7 @@
 """The compatible module about AbstractFileSystem in fsspec."""
 import os
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Optional, Union
 
 from fsspec import AbstractFileSystem
@@ -194,14 +195,21 @@ class FsspecCompatibleFS(AbstractFileSystem):
                     yield path, dirs, files
                 return
 
-        for d in dirs:
-            yield from self.walk(
-                full_dirs[d],
-                maxdepth=maxdepth,
-                detail=detail,
-                topdown=topdown,
-                **kwargs,
-            )
+        with ThreadPoolExecutor() as executor:
+            futures = {
+                executor.submit(
+                    self.walk,
+                    full_dirs[d],
+                    maxdepth=maxdepth,
+                    detail=detail,
+                    topdown=topdown,
+                    **kwargs,
+                ): d
+                for d in dirs
+            }
+            for future in as_completed(futures):
+                for result in future.result():
+                    yield result
 
         if not topdown:
             # Yield after recursion if walking bottom up
