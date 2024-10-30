@@ -376,7 +376,7 @@ class TosFileSystem(FsspecCompatibleFS):
         {'name': 'mybucket/file2', 'size': 456, 'type': 'file'}]
 
         """
-        path = self._strip_protocol(path).rstrip("/")
+        path = self._strip_protocol(path)
         if path in ["", "/"]:
             files = self._ls_buckets()
             return files if detail else sorted([o["name"] for o in files])
@@ -435,7 +435,7 @@ class TosFileSystem(FsspecCompatibleFS):
                 "is not version aware."
             )
 
-        path = self._strip_protocol(path).rstrip("/")
+        path = self._strip_protocol(path)
         bucket, key, _ = self._split_path(path)
         prefix = key.lstrip("/") + "/" if key else ""
         continuation_token = ""
@@ -626,7 +626,7 @@ class TosFileSystem(FsspecCompatibleFS):
 
         """
         logger.warning("Call rmdir api: path %s", path)
-        path = self._strip_protocol(path).rstrip("/") + "/"
+        path = self._strip_protocol(path) + "/"
         bucket, key, _ = self._split_path(path)
         if not key:
             raise TosfsError("Cannot remove a bucket using rmdir api.")
@@ -706,7 +706,7 @@ class TosFileSystem(FsspecCompatibleFS):
             may be permissions, etc.
 
         """
-        path = self._strip_protocol(path).rstrip("/") + "/"
+        path = self._strip_protocol(path) + "/"
         bucket, key, _ = self._split_path(path)
         if not key:
             raise TosfsError(f"Cannot create a bucket {bucket} using mkdir api.")
@@ -746,7 +746,7 @@ class TosFileSystem(FsspecCompatibleFS):
             If False, will error if the target already exists
 
         """
-        path = self._strip_protocol(path).rstrip("/") + "/"
+        path = self._strip_protocol(path) + "/"
         path_exist = self.exists(path)
         if exist_ok and path_exist:
             return
@@ -823,7 +823,7 @@ class TosFileSystem(FsspecCompatibleFS):
         >>> fs.isdir("tos://mybucket/mydir/")
 
         """
-        path = self._strip_protocol(path).rstrip("/") + "/"
+        path = self._strip_protocol(path) + "/"
         bucket, key, _ = self._split_path(path)
         if not key:
             return False
