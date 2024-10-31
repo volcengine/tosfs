@@ -401,6 +401,7 @@ class TosFileSystem(FsspecCompatibleFS):
         detail: bool = False,
         versions: bool = False,
         batch_size: int = LS_OPERATION_DEFAULT_MAX_ITEMS,
+        delimiter: str = "/",
         **kwargs: Union[str, bool, float, None],
     ) -> Generator[Union[dict, str], None, None]:
         """List objects under the given path in batches then returns an iterator.
@@ -415,6 +416,8 @@ class TosFileSystem(FsspecCompatibleFS):
             Whether to list object versions (default is False).
         batch_size : int, optional
             The number of items to fetch in each batch (default is 1000).
+        delimiter : str, optional
+            The delimiter to use for the list operation (default is '/').
         **kwargs : dict, optional
             Additional arguments.
 
@@ -450,7 +453,7 @@ class TosFileSystem(FsspecCompatibleFS):
                     bucket,
                     prefix,
                     start_after=prefix,
-                    delimiter="/",
+                    delimiter=delimiter,
                     max_keys=batch_size,
                     continuation_token=continuation_token,
                 )

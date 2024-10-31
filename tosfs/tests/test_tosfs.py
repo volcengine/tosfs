@@ -97,6 +97,21 @@ def test_ls_iterate(
         result.append(batch)
     assert len(result) == len([dir_name, another_dir_name])
 
+    # test list recursively
+    expected = [
+        f"{bucket}/{temporary_workspace}/{dir_name}",
+        f"{bucket}/{temporary_workspace}/{dir_name}/{file_name}",
+        f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}",
+        f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}/{sub_file_name}",
+        f"{bucket}/{temporary_workspace}/{another_dir_name}",
+    ]
+    result = list(
+        tosfs.ls_iterate(
+            f"{bucket}/{temporary_workspace}", delimiter="", recursive=True
+        )
+    )
+    assert result == expected
+
 
 def test_inner_rm(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
     file_name = random_str()
