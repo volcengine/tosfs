@@ -833,6 +833,72 @@ def test_put(fsspecfs: Any, bucket: str, temporary_workspace: str):
             ), "The downloaded file's contents should match the original test data."
 
 
+def test_put_tree(fsspecfs, bucket, temporary_workspace):
+    with tempfile.TemporaryDirectory() as local_temp_dir:
+        dir_a = f"{local_temp_dir}/a"
+        dir_b = f"{local_temp_dir}/b"
+        dir_a_a = f"{dir_a}/a"
+        dir_a_a_a = f"{dir_a_a}/a"
+
+        # Create tmp.txt in each directory
+        for directory in [dir_a, dir_b, dir_a_a, dir_a_a_a]:
+            os.mkdir(directory)
+            tmp_file_path = os.path.join(directory, "tmp.txt")
+            with open(tmp_file_path, "w") as tmp_file:
+                tmp_file.write("Temporary file content")
+
+        remote_temp_dir = f"{bucket}/{temporary_workspace}/{random_str()}"
+        fsspecfs.mkdir(remote_temp_dir)
+        fsspecfs.put(local_temp_dir, remote_temp_dir, recursive=True)
+
+        # Verify the directory tree on the remote filesystem
+        expected_structure = [
+            (
+                fsspecfs._strip_protocol(f"{remote_temp_dir}"),
+                [os.path.basename(local_temp_dir)],
+                [],
+            ),
+            (
+                fsspecfs._strip_protocol(
+                    f"{remote_temp_dir}/{os.path.basename(local_temp_dir)}"
+                ),
+                ["a", "b"],
+                [],
+            ),
+            (
+                fsspecfs._strip_protocol(
+                    f"{remote_temp_dir}/{os.path.basename(local_temp_dir)}/a"
+                ),
+                ["a"],
+                ["tmp.txt"],
+            ),
+            (
+                fsspecfs._strip_protocol(
+                    f"{remote_temp_dir}/{os.path.basename(local_temp_dir)}/a/a"
+                ),
+                ["a"],
+                ["tmp.txt"],
+            ),
+            (
+                fsspecfs._strip_protocol(
+                    f"{remote_temp_dir}/{os.path.basename(local_temp_dir)}/a/a/a"
+                ),
+                [],
+                ["tmp.txt"],
+            ),
+            (
+                fsspecfs._strip_protocol(
+                    f"{remote_temp_dir}/{os.path.basename(local_temp_dir)}/b"
+                ),
+                [],
+                ["tmp.txt"],
+            ),
+        ]
+
+        actual = list(fsspecfs.walk(remote_temp_dir))
+        assert actual == expected_structure
+
+
 def test_fs_read_block(fsspecfs: Any, bucket: str, temporary_workspace: str):
     file_name = random_str()
     path = f"{bucket}/{temporary_workspace}/{file_name}.txt"
