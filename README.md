@@ -108,10 +108,11 @@ The tosfs package is compatible with the following Python and fsspec versions:
 
 * fsspec
 
-| Version          | Supported |
-|---------------|------|
-| 2023.5.0      | ✅   |
-| 2024.9.0      | ✅   |
+| Version   | Supported |
+|-----------|------|
+| 2023.5.0  | ✅   |
+| 2024.9.0  | ✅   |
+| 2024.10.0 | ✅   |
 
 ## Contributing
 Contributions are very welcome. To learn more, see the [Contributor Guide](https://github.com/volcengine/tosfs/blob/main/CONTRIBUTING.md).
