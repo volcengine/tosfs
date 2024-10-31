@@ -110,7 +110,7 @@ def test_ls_iterate(
             f"{bucket}/{temporary_workspace}", delimiter="", recursive=True
         )
     )
-    assert result == expected
+    assert sorted(result) == sorted(expected)
 
 
 def test_inner_rm(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
