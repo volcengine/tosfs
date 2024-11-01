@@ -889,6 +889,25 @@ class TosFileSystem(FsspecCompatibleFS):
         except Exception as e:
             raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
 
+    def put(
+        self,
+        lpath: str,
+        rpath: str,
+        recursive: bool = False,
+        callback: Any = None,
+        maxdepth: Optional[int] = None,
+        **kwargs: Any,
+    ) -> None:
+        """Copy file(s) from local.
+
+        Copies a specific file or tree of files (if recursive=True). If rpath
+        ends with a "/", it will be assumed to be a directory, and target files
+        will go within.
+
+        Calls put_file for each source.
+        """
+        super().put(lpath, rpath, recursive=recursive, **kwargs)
+
     def put_file(
         self,
         lpath: str,
