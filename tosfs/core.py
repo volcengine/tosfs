@@ -839,7 +839,16 @@ class TosFileSystem(FsspecCompatibleFS):
             raise e
         except TosServerError as e:
             if e.status_code == TOS_SERVER_STATUS_CODE_NOT_FOUND:
-                return False
+                out = retryable_func_executor(
+                    lambda: self.tos_client.list_objects_type2(
+                        bucket,
+                        prefix=key,
+                        delimiter="/",
+                        max_keys=1,
+                    ),
+                    max_retry_num=self.max_retry_num,
+                )
+                return out.key_count > 0
             else:
                 raise e
         except Exception as e:
