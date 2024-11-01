@@ -401,9 +401,9 @@ class TosFileSystem(FsspecCompatibleFS):
         detail: bool = False,
         versions: bool = False,
         batch_size: int = LS_OPERATION_DEFAULT_MAX_ITEMS,
-        delimiter: str = "/",
+        recursive: bool = False,
         **kwargs: Union[str, bool, float, None],
-    ) -> Generator[Union[dict, str], None, None]:
+    ) -> Generator[Union[List[dict], List[str]], None, None]:
         """List objects under the given path in batches then returns an iterator.
 
         Parameters
@@ -416,8 +416,8 @@ class TosFileSystem(FsspecCompatibleFS):
             Whether to list object versions (default is False).
         batch_size : int, optional
             The number of items to fetch in each batch (default is 1000).
-        delimiter : str, optional
-            The delimiter to use for the list operation (default is '/').
+        recursive : bool, optional
+            Whether to list objects recursively (default is False).
         **kwargs : dict, optional
             Additional arguments.
 
@@ -453,7 +453,7 @@ class TosFileSystem(FsspecCompatibleFS):
                     bucket,
                     prefix,
                     start_after=prefix,
-                    delimiter=delimiter,
+                    delimiter=None if recursive else "/",
                     max_keys=batch_size,
                     continuation_token=continuation_token,
                 )
@@ -467,6 +467,7 @@ class TosFileSystem(FsspecCompatibleFS):
             continuation_token = resp.next_continuation_token
             results = resp.contents + resp.common_prefixes
 
+            batch = []
             for obj in results:
                 if isinstance(obj, CommonPrefixInfo):
                     info = self._fill_dir_info(bucket, obj)
@@ -475,7 +476,9 @@ class TosFileSystem(FsspecCompatibleFS):
                 else:
                     info = self._fill_file_info(obj, bucket, versions)
 
-                yield info if detail else info["name"]
+                batch.append(info if detail else info["name"])
+
+            yield batch
 
     def info(
         self,

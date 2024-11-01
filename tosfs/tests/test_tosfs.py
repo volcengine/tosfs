@@ -73,31 +73,41 @@ def test_ls_iterate(
     )
 
     # Test listing without detail
-    result = list(tosfs.ls_iterate(f"{bucket}/{temporary_workspace}"))
+    result = [
+        item
+        for batch in tosfs.ls_iterate(f"{bucket}/{temporary_workspace}")
+        for item in batch
+    ]
     assert f"{bucket}/{temporary_workspace}/{dir_name}" in result
 
     # Test listing with detail
-    result = list(tosfs.ls_iterate(f"{bucket}/{temporary_workspace}", detail=True))
+    result = [
+        item
+        for batch in tosfs.ls_iterate(f"{bucket}/{temporary_workspace}", detail=True)
+        for item in batch
+    ]
     assert any(
         item["name"] == f"{bucket}/{temporary_workspace}/{dir_name}" for item in result
     )
 
     # Test list with iterate
-    for item in tosfs.ls_iterate(f"{bucket}/{temporary_workspace}", detail=True):
-        assert item["name"] in sorted(
-            [
-                f"{bucket}/{temporary_workspace}/{dir_name}",
-                f"{bucket}/{temporary_workspace}/{another_dir_name}",
-            ]
-        )
+    for batch in tosfs.ls_iterate(f"{bucket}/{temporary_workspace}", detail=True):
+        for item in batch:
+            assert item["name"] in sorted(
+                [
+                    f"{bucket}/{temporary_workspace}/{dir_name}",
+                    f"{bucket}/{temporary_workspace}/{another_dir_name}",
+                ]
+            )
 
     # Test listing with batch size and while loop more than one time
     result = []
     for batch in tosfs.ls_iterate(f"{bucket}/{temporary_workspace}", batch_size=1):
-        result.append(batch)
+        for item in batch:
+            result.append(item)
     assert len(result) == len([dir_name, another_dir_name])
 
-    # test list recursively
+    # Test list recursively
     expected = [
         f"{bucket}/{temporary_workspace}/{dir_name}",
         f"{bucket}/{temporary_workspace}/{dir_name}/{file_name}",
@@ -105,11 +115,11 @@ def test_ls_iterate(
         f"{bucket}/{temporary_workspace}/{dir_name}/{sub_dir_name}/{sub_file_name}",
         f"{bucket}/{temporary_workspace}/{another_dir_name}",
     ]
-    result = list(
-        tosfs.ls_iterate(
-            f"{bucket}/{temporary_workspace}", delimiter="", recursive=True
-        )
-    )
+    result = [
+        item
+        for batch in tosfs.ls_iterate(f"{bucket}/{temporary_workspace}", recursive=True)
+        for item in batch
+    ]
     assert sorted(result) == sorted(expected)
 
 
