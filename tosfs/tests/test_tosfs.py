@@ -55,6 +55,27 @@ def test_ls_dir(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> 
 
     assert tosfs.ls(f"{bucket}/{temporary_workspace}/nonexistent", detail=False) == []
 
+    path = f"{bucket}/{temporary_workspace}/a/b/c/d"
+    bucket, key, _ = tosfs._split_path(path)
+    tosfs.tos_client.put_object(bucket=bucket, key=key, content="")
+    assert tosfs.isdir(f"{bucket}/{temporary_workspace}/a")
+    assert not tosfs.isfile(f"{bucket}/{temporary_workspace}/a")
+    assert tosfs.info(f"{bucket}/{temporary_workspace}/a")["type"] == "directory"
+    assert tosfs.exists(f"{bucket}/{temporary_workspace}/a")
+    assert not tosfs.isdir(f"{bucket}/{temporary_workspace}/b")
+    assert not tosfs.isfile(f"{bucket}/{temporary_workspace}/b")
+    assert tosfs.isdir(f"{bucket}/{temporary_workspace}/a/b")
+    assert not tosfs.isfile(f"{bucket}/{temporary_workspace}/a/b")
+    assert tosfs.info(f"{bucket}/{temporary_workspace}/a/b")["type"] == "directory"
+    assert tosfs.exists(f"{bucket}/{temporary_workspace}/a/b")
+    assert tosfs.isdir(f"{bucket}/{temporary_workspace}/a/b/c")
+    assert not tosfs.isfile(f"{bucket}/{temporary_workspace}/a/b/c")
+    assert tosfs.info(f"{bucket}/{temporary_workspace}/a/b/c")["type"] == "directory"
+    assert tosfs.exists(f"{bucket}/{temporary_workspace}/a/b/c")
+    assert not tosfs.isdir(f"{bucket}/{temporary_workspace}/a/b/c/d")
+    assert tosfs.isfile(f"{bucket}/{temporary_workspace}/a/b/c/d")
+    assert tosfs.info(f"{bucket}/{temporary_workspace}/a/b/c/d")["type"] == "file"
+
 
 def test_ls_iterate(
     tosfs: TosFileSystem, bucket: str, temporary_workspace: str

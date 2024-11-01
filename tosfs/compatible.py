@@ -13,9 +13,23 @@
 # limitations under the License.
 
 """The compatible module about AbstractFileSystem in fsspec."""
+import re
 from typing import Any, Optional
 
 from fsspec import AbstractFileSystem
+from fsspec.utils import other_paths
+
+magic_check_bytes = re.compile(b"([*?[])")
+magic_check = re.compile("([*?[])")
+
+
+def has_magic(s: str) -> bool:
+    """Check if a string has glob characters."""
+    if isinstance(s, bytes):
+        match = magic_check_bytes.search(s)
+    else:
+        match = magic_check.search(s)
+    return match is not None
 
 
 class FsspecCompatibleFS(AbstractFileSystem):
@@ -178,3 +192,67 @@ class FsspecCompatibleFS(AbstractFileSystem):
             return names
         else:
             return {name: out[name] for name in names}
+
+    def put(
+        self,
+        lpath: str,
+        rpath: str,
+        recursive: bool = False,
+        callback: Any = None,
+        maxdepth: Optional[int] = None,
+        **kwargs: Any,
+    ) -> None:
+        """Copy file(s) from local.
+
+        Copies a specific file or tree of files (if recursive=True). If rpath
+        ends with a "/", it will be assumed to be a directory, and target files
+        will go within.
+
+        Calls put_file for each source.
+        """
+        if isinstance(lpath, list) and isinstance(rpath, list):
+            # No need to expand paths when both source and destination
+            # are provided as lists
+            rpaths = rpath
+            lpaths = lpath
+        else:
+            from fsspec.implementations.local import (
+                LocalFileSystem,
+                make_path_posix,
+                trailing_sep,
+            )
+
+            source_is_str = isinstance(lpath, str)
+            if source_is_str:
+                lpath = make_path_posix(lpath)
+            fs = LocalFileSystem()
+            lpaths = fs.expand_path(lpath, recursive=recursive, maxdepth=maxdepth)
+            if source_is_str and (not recursive or maxdepth is not None):
+                # Non-recursive glob does not copy directories
+                lpaths = [p for p in lpaths if not (trailing_sep(p) or fs.isdir(p))]
+                if not lpaths:
+                    return
+
+            source_is_file = len(lpaths) == 1
+            dest_is_dir = isinstance(rpath, str) and (
+                trailing_sep(rpath) or self.isdir(rpath)
+            )
+
+            rpath = (
+                self._strip_protocol(rpath)
+                if isinstance(rpath, str)
+                else [self._strip_protocol(p) for p in rpath]
+            )
+            exists = source_is_str and (
+                (has_magic(lpath) and source_is_file)
+                or (not has_magic(lpath) and dest_is_dir and not trailing_sep(lpath))
+            )
+            rpaths = other_paths(
+                lpaths,
+                rpath,
+                exists=exists,
+                flatten=not source_is_str,
+            )
+
+        for lpath, rpath in zip(lpaths, rpaths):
+            self.put_file(lpath, rpath, **kwargs)
