@@ -55,7 +55,7 @@ from tosfs.exceptions import TosfsError
 from tosfs.fsspec_utils import glob_translate
 from tosfs.models import DeletingObject
 from tosfs.mpu import MultipartUploader
-from tosfs.retry import retryable_func_executor
+from tosfs.retry import INVALID_RANGE_CODE, retryable_func_executor
 from tosfs.tag import BucketTagMgr
 from tosfs.utils import find_bucket_key, get_brange
 
@@ -1649,16 +1649,25 @@ class TosFileSystem(FsspecCompatibleFS):
     ) -> Tuple[BinaryIO, int]:
         if kwargs.get("callback") is not None:
             kwargs.pop("callback")
-        resp = retryable_func_executor(
-            lambda: self.tos_client.get_object(
-                bucket,
-                key,
-                version_id=version_id,
-                range_start=range_start,
-                **kwargs,
-            ),
-            max_retry_num=self.max_retry_num,
-        )
+        try:
+            resp = retryable_func_executor(
+                lambda: self.tos_client.get_object(
+                    bucket,
+                    key,
+                    version_id=version_id,
+                    range_start=range_start,
+                    **kwargs,
+                ),
+                max_retry_num=self.max_retry_num,
+            )
+        except TosServerError as e:
+            if e.status_code == INVALID_RANGE_CODE:
+                obj_info = self._object_info(bucket=bucket, key=key)
+                if obj_info["size"] == 0 or range_start == obj_info["size"]:
+                    return io.BytesIO(), 0
+            else:
+                raise e
+
         return resp.content, resp.content_length
 
     def _bucket_info(self, bucket: str) -> dict:
