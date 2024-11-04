@@ -58,6 +58,7 @@ from tosfs.mpu import MultipartUploader
 from tosfs.retry import INVALID_RANGE_CODE, retryable_func_executor
 from tosfs.tag import BucketTagMgr
 from tosfs.utils import find_bucket_key, get_brange
+from tosfs.version import Version
 
 logger = logging.getLogger("tosfs")
 
@@ -241,6 +242,10 @@ class TosFileSystem(FsspecCompatibleFS):
             proxy_username=proxy_username,
             proxy_password=proxy_password,
             except100_continue_threshold=except100_continue_threshold,
+            user_agent_product_name="EMR",
+            user_agent_soft_name="TOSFS",
+            user_agent_soft_version=Version.version,
+            user_agent_customized_key_values={"revision": Version.revision},
         )
         if version_aware:
             raise ValueError("Currently, version_aware is not supported.")
