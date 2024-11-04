@@ -23,12 +23,12 @@ classifiers = [
 [tool.poetry.dependencies]
 python = "^3.9"
 fsspec = ">=2023.5.0"
-tos = ">=2.7.2"
+tos = ">=2.8.0"
 volcengine= "^1.0.154"
 
 [tool.poetry.group.dev.dependencies]
 fsspec = ">=2023.5.0"
-tos = ">=2.7.2"
+tos = ">=2.8.0"
 black = "^24.4.1"
 isort = "^5.13.2"
 mypy = "^1.10.0"

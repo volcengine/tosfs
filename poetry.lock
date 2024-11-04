@@ -767,12 +767,12 @@ files = [
 
 [[package]]
 name = "tos"
-version = "2.7.2"
+version = "2.8.0"
 description = "Volc TOS (Tinder Object Storage) SDK"
 optional = false
 python-versions = "*"
 files = [
-    {file = "tos-2.7.2.tar.gz", hash = "sha256:3c31257716785bca7b2cac51474ff32543cda94075a7b7aff70d769c15c7b7ed"},
+    {file = "tos-2.8.0.tar.gz", hash = "sha256:b9d6a6a7173b4adc5220682bda0d7f01289b89fce633d194373cc68a6b9c65e2"},
 ]
 
 [package.dependencies]
@@ -925,4 +925,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "f304302003c07e8db91a320636218f6027d70458d4d6cbab0d399394e827e952"
+content-hash = "9697c104245ffd57d622cb85d77a1cfcdded3c3f2ae0e6b8a2c58f4f97761778"
