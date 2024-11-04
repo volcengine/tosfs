@@ -401,19 +401,26 @@ def test_get_file(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -
     file_name = random_str()
     file_content = "hello world"
     rpath = f"{bucket}/{temporary_workspace}/{file_name}"
-    lpath = f"{tempfile.mkdtemp()}/{file_name}"
-    assert not os.path.exists(lpath)
 
-    bucket, key, _ = tosfs._split_path(rpath)
-    with tosfs.open(rpath, "w") as f:
-        f.write(file_content)
+    with tempfile.TemporaryDirectory() as local_temp_dir:
+        tosfs.touch(rpath)
+        tosfs.get_file(rpath, f"{local_temp_dir}/{file_name}")
+        tosfs.rm_file(rpath)
 
-    tosfs.get_file(rpath, lpath)
-    with open(lpath, "r") as f:
-        assert f.read() == file_content
+    with tempfile.TemporaryDirectory() as local_temp_dir:
+        lpath = f"{local_temp_dir}/{file_name}"
+        assert not os.path.exists(lpath)
 
-    with pytest.raises(FileNotFoundError):
-        tosfs.get_file(f"{bucket}/{temporary_workspace}/nonexistent", lpath)
+        bucket, key, _ = tosfs._split_path(rpath)
+        with tosfs.open(rpath, "w") as f:
+            f.write(file_content)
+
+        tosfs.get_file(rpath, lpath)
+        with open(lpath, "r") as f:
+            assert f.read() == file_content
+
+        with pytest.raises(FileNotFoundError):
+            tosfs.get_file(f"{bucket}/{temporary_workspace}/nonexistent", lpath)
 
 
 def test_walk(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
