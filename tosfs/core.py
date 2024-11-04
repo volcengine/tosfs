@@ -245,9 +245,7 @@ class TosFileSystem(FsspecCompatibleFS):
             user_agent_product_name="EMR",
             user_agent_soft_name="TOSFS",
             user_agent_soft_version=Version.version,
-            user_agent_customized_key_values={
-                "revision": Version.revision
-            }
+            user_agent_customized_key_values={"revision": Version.revision},
         )
         if version_aware:
             raise ValueError("Currently, version_aware is not supported.")
