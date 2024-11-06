@@ -397,6 +397,72 @@ def test_put_file(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -
         assert f.read() == b"a" * 1024 * 1024 * 6
 
 
+def test_put(tosfs: TosFileSystem, bucket: str, temporary_workspace: str):
+    with tempfile.TemporaryDirectory() as local_temp_dir:
+        dir_1 = f"{local_temp_dir}/生技[2005]174号文/"
+        os.makedirs(dir_1)
+        with open(f"{dir_1}/test.txt", "w") as f:
+            f.write("hello world")
+        tosfs.put(
+            local_temp_dir,
+            f"{bucket}/{temporary_workspace}",
+            recursive=True,
+            disable_glob=True,
+        )
+        assert tosfs.exists(
+            f"{bucket}/{temporary_workspace}/{os.path.basename(local_temp_dir)}"
+            f"/生技[2005]174号文/"
+        )
+        assert tosfs.exists(
+            f"{bucket}/{temporary_workspace}/{os.path.basename(local_temp_dir)}"
+            f"/生技[2005]174号文/test.txt"
+        )
+        with tosfs.open(
+            f"{bucket}/{temporary_workspace}/"
+            f"{os.path.basename(local_temp_dir)}/生技[2005]174号文/test.txt",
+            mode="r",
+        ) as file:
+            assert file.read() == "hello world"
+
+    with tempfile.TemporaryDirectory() as local_temp_dir:
+        dir_2 = f"{local_temp_dir}/生技??174号文/"
+        dir_3 = f"{local_temp_dir}/生技**174号文/"
+        dir_4 = f"{local_temp_dir}/生技_=+&^%#174号文/"
+        os.makedirs(dir_2)
+        os.makedirs(dir_3)
+        os.makedirs(dir_4)
+        with open(f"{dir_2}/test.txt", "w") as f:
+            f.write("hello world")
+        tosfs.put(
+            local_temp_dir,
+            f"{bucket}/{temporary_workspace}",
+            recursive=True,
+            disable_glob=True,
+        )
+        assert tosfs.exists(
+            f"{bucket}/{temporary_workspace}/{os.path.basename(local_temp_dir)}"
+            f"/生技??174号文/"
+        )
+        assert tosfs.exists(
+            f"{bucket}/{temporary_workspace}/{os.path.basename(local_temp_dir)}"
+            f"/生技??174号文/test.txt"
+        )
+        assert tosfs.exists(
+            f"{bucket}/{temporary_workspace}/{os.path.basename(local_temp_dir)}"
+            f"/生技**174号文/"
+        )
+        assert tosfs.exists(
+            f"{bucket}/{temporary_workspace}/{os.path.basename(local_temp_dir)}"
+            f"/生技_=+&^%#174号文/"
+        )
+        with tosfs.open(
+            f"{bucket}/{temporary_workspace}/"
+            f"{os.path.basename(local_temp_dir)}/生技??174号文/test.txt",
+            mode="r",
+        ) as file:
+            assert file.read() == "hello world"
+
+
 def test_get_file(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
     file_name = random_str()
     file_content = "hello world"
