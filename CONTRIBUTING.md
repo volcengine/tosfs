@@ -10,7 +10,7 @@ This instructions are for linux base systems. (Linux, MacOS, BSD, etc.)
 - On github interface click on `Fork` button.
 - Clone your fork of this repo. `git clone git@github.com:YOUR_GIT_USERNAME/tosfs.git`
 - Enter the directory `cd tosfs`
-- Add upstream repo `git remote add upstream https://github.com/volcengine/tosfs.git`
+- Add upstream repo `git remote add upstream https://github.com/fsspec/tosfs.git`
 
 ## Setting up your own virtual environment
 

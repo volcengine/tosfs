@@ -7,7 +7,7 @@
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
 [![Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Doc Status](https://readthedocs.org/projects/tosfs/badge/?version=latest)](https://tosfs.readthedocs.io/en/latest/?badge=latest)
-![Build](https://github.com/volcengine/tosfs/workflows/CI/badge.svg)
+![Build](https://github.com/fsspec/tosfs/workflows/CI/badge.svg)
 
 
 TOSFS builds on [Volcengine TOS Python SDK](https://github.com/volcengine/ve-tos-python-sdk) to provide a convenient Python filesystem interface for [TOS（Tinder Object Storage）](https://www.volcengine.com/docs/6349/74820).
@@ -91,7 +91,7 @@ with tosfs.open('bucket/root/text.txt', mode='rb') as f:
 
 ### integration usages
 
-For more usage in ray, pyspark, pytorch and so on, please refer to the [examples](https://github.com/volcengine/tosfs/tree/main/examples) dir.
+For more usage in ray, pyspark, pytorch and so on, please refer to the [examples](https://github.com/fsspec/tosfs/tree/main/examples) dir.
 
 ## Compatibility
 
@@ -115,16 +115,16 @@ The tosfs package is compatible with the following Python and fsspec versions:
 | 2024.10.0 | ✅   |
 
 ## Contributing
-Contributions are very welcome. To learn more, see the [Contributor Guide](https://github.com/volcengine/tosfs/blob/main/CONTRIBUTING.md).
+Contributions are very welcome. To learn more, see the [Contributor Guide](https://github.com/fsspec/tosfs/blob/main/CONTRIBUTING.md).
 
 ## License
-Distributed under the terms of the [Apache 2.0 license](https://github.com/volcengine/tosfs/blob/main/LICENSE), Tosfs is free and open source software.
+Distributed under the terms of the [Apache 2.0 license](https://github.com/fsspec/tosfs/blob/main/LICENSE), Tosfs is free and open source software.
 
 ## Issues
-If you encounter any problems, please [file an issue](https://github.com/volcengine/tosfs/issues/new/choose) along with a detailed description.
+If you encounter any problems, please [file an issue](https://github.com/fsspec/tosfs/issues/new/choose) along with a detailed description.
 
 ## Privacy Statement
-Welcome to use our open-source project [tosfs](https://github.com/volcengine/tosfs). We highly value your privacy and are committed to protecting your information. This privacy statement aims to inform you about how we collect, use, store, and protect your information within the project (we believe you have the right to know).
+Welcome to use our open-source project [tosfs](https://github.com/fsspec/tosfs). We highly value your privacy and are committed to protecting your information. This privacy statement aims to inform you about how we collect, use, store, and protect your information within the project (we believe you have the right to know).
 
     Information Collection: 
       We may collect the names of the buckets you access in the TOS service 
