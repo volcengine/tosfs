@@ -907,6 +907,7 @@ class TosFileSystem(FsspecCompatibleFS):
         recursive: bool = False,
         callback: Any = None,
         maxdepth: Optional[int] = None,
+        disable_glob: bool = False,
         **kwargs: Any,
     ) -> None:
         """Copy file(s) from local.
@@ -917,7 +918,9 @@ class TosFileSystem(FsspecCompatibleFS):
 
         Calls put_file for each source.
         """
-        super().put(lpath, rpath, recursive=recursive, **kwargs)
+        super().put(
+            lpath, rpath, recursive=recursive, disable_glob=disable_glob, **kwargs
+        )
 
     def put_file(
         self,

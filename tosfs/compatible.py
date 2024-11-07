@@ -13,10 +13,12 @@
 # limitations under the License.
 
 """The compatible module about AbstractFileSystem in fsspec."""
+import os
 import re
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from fsspec import AbstractFileSystem
+from fsspec.implementations.local import LocalFileSystem
 from fsspec.utils import other_paths
 
 magic_check_bytes = re.compile(b"([*?[])")
@@ -30,6 +32,66 @@ def has_magic(s: str) -> bool:
     else:
         match = magic_check.search(s)
     return match is not None
+
+
+class EnhancedLocalFileSystem(LocalFileSystem):
+    """Enhanced LocalFileSystem than fsspec's LocalFileSystem."""
+
+    def expand_path(
+        self,
+        path: Union[str, list[str]],
+        recursive: bool = False,
+        maxdepth: Optional[int] = None,
+        disable_glob: bool = False,
+        **kwargs: Any,
+    ) -> Union[str, list[str]]:
+        """Turn one or more globs or dirs into a list of files or dirs.
+
+        kwargs are passed to ``glob`` or ``find``, which may in turn call ``ls``
+        """
+        # type: ignore
+        if maxdepth is not None and maxdepth < 1:
+            raise ValueError("maxdepth must be at least 1")
+
+        if isinstance(path, (str, os.PathLike)):
+            out = self.expand_path(
+                [path], recursive, maxdepth, disable_glob=disable_glob
+            )
+        else:
+            out = set()  # type: ignore
+            path = [self._strip_protocol(p) for p in path]
+            for p in path:
+                if has_magic(p) and not disable_glob:
+                    bit = set(self.glob(p, maxdepth=maxdepth, **kwargs))
+                    out |= bit  # type: ignore
+                    if recursive:
+                        # glob call above expanded one depth so if maxdepth is defined
+                        # then decrement it in expand_path call below. If it is zero
+                        # after decrementing then avoid expand_path call.
+                        if maxdepth is not None and maxdepth <= 1:
+                            continue
+                        out |= set(  # type: ignore
+                            self.expand_path(
+                                list(bit),
+                                recursive=recursive,
+                                maxdepth=maxdepth - 1 if maxdepth is not None else None,
+                                **kwargs,
+                            )
+                        )
+                    continue
+                elif recursive:
+                    rec = set(
+                        self.find(
+                            p, maxdepth=maxdepth, withdirs=True, detail=False, **kwargs
+                        )
+                    )
+                    out |= rec  # type: ignore
+                if p not in out and (recursive is False or self.exists(p)):
+                    # should only check once, for the root
+                    out.add(p)  # type: ignore
+        if not out:
+            raise FileNotFoundError(path)
+        return sorted(out)
 
 
 class FsspecCompatibleFS(AbstractFileSystem):
@@ -200,6 +262,7 @@ class FsspecCompatibleFS(AbstractFileSystem):
         recursive: bool = False,
         callback: Any = None,
         maxdepth: Optional[int] = None,
+        disable_glob: bool = False,
         **kwargs: Any,
     ) -> None:
         """Copy file(s) from local.
@@ -216,17 +279,15 @@ class FsspecCompatibleFS(AbstractFileSystem):
             rpaths = rpath
             lpaths = lpath
         else:
-            from fsspec.implementations.local import (
-                LocalFileSystem,
-                make_path_posix,
-                trailing_sep,
-            )
+            from fsspec.implementations.local import make_path_posix, trailing_sep
 
             source_is_str = isinstance(lpath, str)
             if source_is_str:
                 lpath = make_path_posix(lpath)
-            fs = LocalFileSystem()
-            lpaths = fs.expand_path(lpath, recursive=recursive, maxdepth=maxdepth)
+            fs = EnhancedLocalFileSystem()
+            lpaths = fs.expand_path(
+                lpath, recursive=recursive, maxdepth=maxdepth, disable_glob=disable_glob
+            )
             if source_is_str and (not recursive or maxdepth is not None):
                 # Non-recursive glob does not copy directories
                 lpaths = [p for p in lpaths if not (trailing_sep(p) or fs.isdir(p))]
