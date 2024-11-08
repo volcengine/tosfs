@@ -20,7 +20,7 @@ from tos.exceptions import TosClientError, TosServerError
 from tos.http import Response
 from urllib3.exceptions import ProtocolError
 
-from tosfs.retry import is_retryable_exception, _get_sleep_time
+from tosfs.retry import _get_sleep_time, is_retryable_exception
 
 mock_resp = Mock(spec=requests.Response)
 
@@ -91,17 +91,19 @@ def test_is_retry_exception(
 def test_get_sleep_time():
     mock_resp = Mock(spec=requests.Response)
 
+    sleep_time = 1000
+
     mock_resp.status_code = 429
     mock_resp.headers = {
-        'Content-Type': 'application/json',
-        'Date': 'Thu, 07 Nov 2024 17:19:56 GMT',
-        'Retry-After': '1000',
-        'Server': 'TosServer',
-        'x-tos-ec': '0004-00000007',
-        'x-tos-id-2': '0000-00000-0000',
-        'x-tos-request-id': '0000-0000-0000',
-        'x-tos-server-time': '1',
-        'Content-Length': '277'
+        "Content-Type": "application/json",
+        "Date": "Thu, 07 Nov 2024 17:19:56 GMT",
+        "Retry-After": str(sleep_time),
+        "Server": "TosServer",
+        "x-tos-ec": "0004-00000007",
+        "x-tos-id-2": "0000-00000-0000",
+        "x-tos-request-id": "0000-0000-0000",
+        "x-tos-server-time": "1",
+        "Content-Length": "277",
     }
     mock_resp.iter_content = Mock(return_value=[b"chunk1", b"chunk2", b"chunk3"])
     mock_resp.json = Mock(return_value={"key": "value"})
@@ -118,4 +120,4 @@ def test_get_sleep_time():
         "0004-00000001",
     )
 
-    assert _get_sleep_time(err, 1) == 1000
+    assert _get_sleep_time(err, 1) == sleep_time
