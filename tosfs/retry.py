@@ -164,10 +164,10 @@ def _get_sleep_time(err: TosError, retry_count: int) -> float:
             err.status_code == TOO_MANY_REQUESTS_CODE
             or err.status_code == SERVICE_UNAVAILABLE
         )
-        and "retry-after" in err.headers
+        and "retry-after" in err.header
     ):
         try:
-            sleep_time = max(int(err.headers["retry-after"]), int(sleep_time))
+            sleep_time = max(int(err.header["retry-after"]), int(sleep_time))
         except Exception as e:
             from tosfs.core import logger
 
