@@ -462,7 +462,7 @@ def test_put(tosfs: TosFileSystem, bucket: str, temporary_workspace: str):
         ) as file:
             assert file.read() == "hello world"
 
-    # test two layer dirs of special-char
+    # test let special-char dir as the lpath
     with tempfile.TemporaryDirectory() as local_temp_dir:
         dir_1 = f"{local_temp_dir}/08《国家电网公司输变电设备技术监督规定》"
         dir_1_1 = (
