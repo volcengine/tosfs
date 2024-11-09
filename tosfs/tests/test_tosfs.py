@@ -462,6 +462,39 @@ def test_put(tosfs: TosFileSystem, bucket: str, temporary_workspace: str):
         ) as file:
             assert file.read() == "hello world"
 
+    # test let special-char dir as the lpath
+    with tempfile.TemporaryDirectory() as local_temp_dir:
+        dir_1 = f"{local_temp_dir}/08《国家电网公司输变电设备技术监督规定》"
+        dir_1_1 = (
+            f"{local_temp_dir}/08《国家电网公司输变电设备技术监督规定》/"
+            f"生技[2005]174号文"
+        )
+        dir_1_1_1 = (
+            f"{local_temp_dir}/08《国家电网公司输变电设备技术监督规定》/"
+            f"生技[2005]174号文/images"
+        )
+        os.makedirs(dir_1)
+        os.makedirs(dir_1_1)
+        os.makedirs(dir_1_1_1)
+        with open(f"{dir_1_1}/test.txt", "w") as f:
+            f.write("hello world")
+        tosfs.put(
+            f"{dir_1_1}",
+            f"{bucket}/{temporary_workspace}",
+            recursive=True,
+            disable_glob=True,
+        )
+        assert tosfs.exists(f"{bucket}/{temporary_workspace}/生技[2005]174号文")
+        assert tosfs.exists(f"{bucket}/{temporary_workspace}/生技[2005]174号文/images")
+        assert tosfs.exists(
+            f"{bucket}/{temporary_workspace}/" f"生技[2005]174号文/test.txt"
+        )
+        with tosfs.open(
+            f"{bucket}/{temporary_workspace}/生技[2005]174号文/test.txt",
+            mode="r",
+        ) as file:
+            assert file.read() == "hello world"
+
 
 def test_get_file(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
     file_name = random_str()

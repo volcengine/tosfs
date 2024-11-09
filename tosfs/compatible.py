@@ -306,7 +306,11 @@ class FsspecCompatibleFS(AbstractFileSystem):
             )
             exists = source_is_str and (
                 (has_magic(lpath) and source_is_file)
-                or (not has_magic(lpath) and dest_is_dir and not trailing_sep(lpath))
+                or (
+                    (not has_magic(lpath) or disable_glob)
+                    and dest_is_dir
+                    and not trailing_sep(lpath)
+                )
             )
             rpaths = other_paths(
                 lpaths,
