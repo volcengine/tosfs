@@ -99,3 +99,15 @@ def get_brange(size: int, block: int) -> Generator[Tuple[int, int], None, None]:
     """
     for offset in range(0, size, block):
         yield offset, min(offset + block - 1, size - 1)
+
+
+def is_dir(key: str) -> bool:
+    """Check if the key is a directory.
+
+    Parameters
+    ----------
+    key : str
+        The key to check.
+
+    """
+    return key.endswith("/")

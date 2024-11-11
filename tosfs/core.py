@@ -573,38 +573,15 @@ class TosFileSystem(FsspecCompatibleFS):
             return self._exists_bucket(bucket)
 
         try:
-            return retryable_func_executor(
-                lambda: self.tos_client.head_object(bucket, key) and True,
+            resp = retryable_func_executor(
+                lambda: self.tos_client.get_file_status(bucket, key),
                 max_retry_num=self.max_retry_num,
             )
+            return resp.key is not None
         except TosServerError as e:
             if e.status_code == TOS_SERVER_STATUS_CODE_NOT_FOUND:
-                try:
-                    return retryable_func_executor(
-                        lambda: self.tos_client.head_object(
-                            bucket, key.rstrip("/") + "/"
-                        )
-                        and True,
-                        max_retry_num=self.max_retry_num,
-                    )
-                except TosServerError as ex:
-                    if e.status_code == TOS_SERVER_STATUS_CODE_NOT_FOUND:
-                        resp = retryable_func_executor(
-                            lambda: self.tos_client.list_objects_type2(
-                                bucket,
-                                key.rstrip("/") + "/",
-                                start_after=key.rstrip("/") + "/",
-                                max_keys=1,
-                            ),
-                            max_retry_num=self.max_retry_num,
-                        )
-                        return len(resp.contents) > 0
-                    else:
-                        raise ex
-            else:
-                raise e
-        except Exception as ex:
-            raise TosfsError(f"Tosfs failed with unknown error: {ex}") from ex
+                return False
+            raise e
 
     def rm_file(self, path: str) -> None:
         """Delete a file."""
