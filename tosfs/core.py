@@ -823,7 +823,7 @@ class TosFileSystem(FsspecCompatibleFS):
                 lambda: self.tos_client.get_file_status(bucket, key),
                 max_retry_num=self.max_retry_num,
             )
-            return resp.key is not None and is_dir(resp.key)
+            return resp.key is not None and is_dir(resp.key, key)
         except TosServerError as e:
             if e.status_code == TOS_SERVER_STATUS_CODE_NOT_FOUND:
                 return False
