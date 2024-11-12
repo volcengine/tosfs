@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: CI-FNS
+name: CI-HNS
 
 on:
   push:
@@ -36,7 +36,7 @@ jobs:
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
         fsspec-version: ["2023.5.0", "2024.9.0", "2024.10.0"]
-        bucket-name: ["proton-ci"]
+        bucket-name: ["proton-ci-hns"]
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
