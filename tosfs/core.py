@@ -57,7 +57,7 @@ from tosfs.models import DeletingObject
 from tosfs.mpu import MultipartUploader
 from tosfs.retry import INVALID_RANGE_CODE, retryable_func_executor
 from tosfs.tag import BucketTagMgr
-from tosfs.utils import find_bucket_key, get_brange
+from tosfs.utils import find_bucket_key, get_brange, is_dir
 from tosfs.version import Version
 
 logger = logging.getLogger("tosfs")
@@ -573,38 +573,15 @@ class TosFileSystem(FsspecCompatibleFS):
             return self._exists_bucket(bucket)
 
         try:
-            return retryable_func_executor(
-                lambda: self.tos_client.head_object(bucket, key) and True,
+            resp = retryable_func_executor(
+                lambda: self.tos_client.get_file_status(bucket, key),
                 max_retry_num=self.max_retry_num,
             )
+            return resp.key is not None
         except TosServerError as e:
             if e.status_code == TOS_SERVER_STATUS_CODE_NOT_FOUND:
-                try:
-                    return retryable_func_executor(
-                        lambda: self.tos_client.head_object(
-                            bucket, key.rstrip("/") + "/"
-                        )
-                        and True,
-                        max_retry_num=self.max_retry_num,
-                    )
-                except TosServerError as ex:
-                    if e.status_code == TOS_SERVER_STATUS_CODE_NOT_FOUND:
-                        resp = retryable_func_executor(
-                            lambda: self.tos_client.list_objects_type2(
-                                bucket,
-                                key.rstrip("/") + "/",
-                                start_after=key.rstrip("/") + "/",
-                                max_keys=1,
-                            ),
-                            max_retry_num=self.max_retry_num,
-                        )
-                        return len(resp.contents) > 0
-                    else:
-                        raise ex
-            else:
-                raise e
-        except Exception as ex:
-            raise TosfsError(f"Tosfs failed with unknown error: {ex}") from ex
+                return False
+            raise e
 
     def rm_file(self, path: str) -> None:
         """Delete a file."""
@@ -842,28 +819,15 @@ class TosFileSystem(FsspecCompatibleFS):
         key = key.rstrip("/") + "/"
 
         try:
-            return retryable_func_executor(
-                lambda: self.tos_client.head_object(bucket, key) and True,
+            resp = retryable_func_executor(
+                lambda: self.tos_client.get_file_status(bucket, key),
                 max_retry_num=self.max_retry_num,
             )
-        except TosClientError as e:
-            raise e
+            return resp.key is not None and is_dir(resp.key, key)
         except TosServerError as e:
             if e.status_code == TOS_SERVER_STATUS_CODE_NOT_FOUND:
-                out = retryable_func_executor(
-                    lambda: self.tos_client.list_objects_type2(
-                        bucket,
-                        prefix=key,
-                        delimiter="/",
-                        max_keys=1,
-                    ),
-                    max_retry_num=self.max_retry_num,
-                )
-                return out.key_count > 0
-            else:
-                raise e
-        except Exception as e:
-            raise TosfsError(f"Tosfs failed with unknown error: {e}") from e
+                return False
+            raise e
 
     def isfile(self, path: str) -> bool:
         """Check if the path is a file.
