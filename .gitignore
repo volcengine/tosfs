@@ -81,3 +81,6 @@ dmypy.json
 
 # IDE
 .idea
+
+# OS
+.DS_Store
