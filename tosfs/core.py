@@ -2191,7 +2191,10 @@ class TosFileSystem(FsspecCompatibleFS):
         )
 
     def _get_bucket_type(self, bucket: str) -> str:
-        bucket_type = self.tos_client._get_bucket_type(bucket)
+        bucket_type = retryable_func_executor(
+            lambda: self.tos_client._get_bucket_type(bucket),
+            max_retry_num=self.max_retry_num,
+        )
         if not bucket_type:
             return TOS_BUCKET_TYPE_FNS
 
