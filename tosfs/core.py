@@ -232,7 +232,7 @@ class TosFileSystem(FsspecCompatibleFS):
                 "The 'endpoint_url' parameter is deprecated and will be removed"
                 " in a future release. Please use 'endpoint' instead.",
                 DeprecationWarning,
-                stacklevel=2
+                stacklevel=2,
             )
             endpoint = endpoint_url
 
