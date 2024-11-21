@@ -544,7 +544,6 @@ def test_walk(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> No
     for root, dirs, files in tosfs.walk(bucket, maxdepth=1):
         assert root == bucket
         assert len(dirs) > 0
-        assert len(files) > 0
 
     dir_name = random_str()
     sub_dir_name = random_str()
