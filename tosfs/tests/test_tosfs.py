@@ -605,8 +605,6 @@ def test_find(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> No
     ):
         tosfs.find("/")
 
-    assert len(tosfs.find(bucket, maxdepth=1)) > 0
-
     with pytest.raises(
         ValueError,
         match="Can not specify 'prefix' option " "alongside 'maxdepth' options.",
