@@ -18,6 +18,7 @@ import logging
 import mimetypes
 import os
 import tempfile
+import warnings
 from glob import has_magic
 from typing import Any, BinaryIO, Collection, Generator, List, Optional, Tuple, Union
 
@@ -104,7 +105,7 @@ class TosFileSystem(FsspecCompatibleFS):
 
     def __init__(
         self,
-        endpoint_url: Optional[str] = None,
+        endpoint: Optional[str] = None,
         key: str = "",
         secret: str = "",
         region: Optional[str] = None,
@@ -132,14 +133,15 @@ class TosFileSystem(FsspecCompatibleFS):
         proxy_password: Optional[str] = None,
         disable_encoding_meta: Optional[bool] = None,
         except100_continue_threshold: int = 65536,
+        endpoint_url: Optional[str] = None,  # Deprecated parameter
         **kwargs: Any,
     ) -> None:
         """Initialise the TosFileSystem.
 
         Parameters
         ----------
-        endpoint_url : str, optional
-            The endpoint URL of the TOS service.
+        endpoint : str, optional
+            The endpoint of the TOS service.
         key : str
             The access key ID(ak) to access the TOS service.
         secret : str
@@ -219,14 +221,25 @@ class TosFileSystem(FsspecCompatibleFS):
             length of the data to be uploaded greater than the threshold
             (if the length of the data cannot be predicted, it is uniformly determined
             to be greater than the threshold), unit byte, default 65536
+        endpoint_url : str, optional
+            (deprecated) The endpoint URL of the TOS service.
         kwargs : Any, optional
             Additional arguments.
 
         """
+        if endpoint_url is not None:
+            warnings.warn(
+                "The 'endpoint_url' parameter is deprecated and will be removed"
+                " in a future release. Please use 'endpoint' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            endpoint = endpoint_url
+
         self.tos_client = tos.TosClientV2(
             key,
             secret,
-            endpoint_url,
+            endpoint,
             region,
             security_token=session_token,
             max_retry_count=0,

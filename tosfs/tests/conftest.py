@@ -35,7 +35,7 @@ def _tosfs_env_prepare() -> None:
 @pytest.fixture(scope="module")
 def tosfs(_tosfs_env_prepare: None) -> TosFileSystem:
     tosfs = TosFileSystem(
-        endpoint_url=os.environ.get("TOS_ENDPOINT"),
+        endpoint=os.environ.get("TOS_ENDPOINT"),
         region=os.environ.get("TOS_REGION"),
         credentials_provider=EnvCredentialsProvider(),
         max_retry_num=1000,

@@ -27,7 +27,7 @@ def test_fssepc_register():
 
     tosfs, _ = fsspec.core.url_to_fs(
         "tos://",
-        endpoint_url=os.environ.get("TOS_ENDPOINT"),
+        endpoint=os.environ.get("TOS_ENDPOINT"),
         region=os.environ.get("TOS_REGION"),
         credentials_provider=EnvCredentialsProvider(),
     )
@@ -53,7 +53,7 @@ def test_fsspec_open(bucket, temporary_workspace):
     content = "Hello TOSFS."
     with fsspec.open(
         f"tos://{bucket}/{temporary_workspace}/{file}",
-        endpoint_url=os.environ.get("TOS_ENDPOINT"),
+        endpoint=os.environ.get("TOS_ENDPOINT"),
         region=os.environ.get("TOS_REGION"),
         credentials_provider=EnvCredentialsProvider(),
         mode="w",
@@ -76,7 +76,7 @@ class MyTosFileSystem(TosFileSystem):
     def __init__(self):
         """Init MyTosFileSystem."""
         super().__init__(
-            endpoint_url=os.environ.get("TOS_ENDPOINT"),
+            endpoint=os.environ.get("TOS_ENDPOINT"),
             region=os.environ.get("TOS_REGION"),
             credentials_provider=EnvCredentialsProvider(),
         )
