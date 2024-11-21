@@ -9,6 +9,8 @@
 [![Doc Status](https://readthedocs.org/projects/tosfs/badge/?version=latest)](https://tosfs.readthedocs.io/en/latest/?badge=latest)
 ![Build-FNS](https://github.com/fsspec/tosfs/workflows/CI-FNS/badge.svg)
 ![Build-HNS](https://github.com/fsspec/tosfs/workflows/CI-HNS/badge.svg)
+![PyPI - Downloads](https://img.shields.io/pypi/dm/tosfs)
+![PyPI Downloads](https://static.pepy.tech/badge/tosfs)
 
 
 TOSFS builds on [Volcengine TOS Python SDK](https://github.com/volcengine/ve-tos-python-sdk) to provide a convenient Python filesystem interface for [TOS（Tinder Object Storage）](https://www.volcengine.com/docs/6349/74820).
