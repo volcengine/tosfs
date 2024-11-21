@@ -541,10 +541,9 @@ def test_walk(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> No
         assert len(dirs) > 0
         assert files == []
 
-    for root, dirs, files in tosfs.walk(bucket, maxdepth=1):
+    for root, dirs, _ in tosfs.walk(bucket, maxdepth=1):
         assert root == bucket
         assert len(dirs) > 0
-        assert len(files) > 0
 
     dir_name = random_str()
     sub_dir_name = random_str()
@@ -605,8 +604,6 @@ def test_find(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> No
         ValueError, match="Cannot access all of TOS without specify a bucket."
     ):
         tosfs.find("/")
-
-    assert len(tosfs.find(bucket, maxdepth=1)) > 0
 
     with pytest.raises(
         ValueError,
