@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "tosfs"
-version = "2024.11.3.dev0"
+version = "2024.11.3"
 description = "tosfs is a Pythonic file-system interface for TOS（Tinder Object Storage）."
 authors = ["Vino Yang <yanghua@bytedance.com>"]
 license = "Apache-2.0"
