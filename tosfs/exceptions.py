@@ -11,7 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""iT contains exceptions definition for the tosfs package."""
+
+"""It contains exceptions definition for the tosfs package."""
 
 
 class TosfsError(Exception):
@@ -19,4 +20,12 @@ class TosfsError(Exception):
 
     def __init__(self, message: str):
         """Initialize the base class for all exceptions in the tosfs package."""
+        super().__init__(message)
+
+
+class TosfsCertificationError(TosfsError):
+    """Exception class for certification related exception."""
+
+    def __init__(self, message: str):
+        """Initialize the exception class for certification related exception."""
         super().__init__(message)
