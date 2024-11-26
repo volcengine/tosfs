@@ -17,12 +17,13 @@ TOSFS builds on [Volcengine TOS Python SDK](https://github.com/volcengine/ve-tos
 
 ## Features
 
-* Excellent read/write performance (optimized by multi-threading and multi-disk staging).
+* Excellent read/write performance than `s3fs` (optimized by multi-threading and multi-disk staging).
 * Solid stability (fine-grained judgment on response codes for TOS services).
 * Outstanding compatibility (cross-validation completed on the version matrix of four Python versions and two fsspec versions).
-* TOS HNS (Hierarchical NameSpace) Bucket support (in adaptation and verification).
+* TOS HNS (Hierarchical NameSpace) Bucket support(Beta).
 * Native [append API](https://www.volcengine.com/docs/6349/74863) support.
 * Extended features:
+  * support assume role credentials; 
   * batch list iterate;
   * multiple thread walk;
   * support special characters in local path;
@@ -73,6 +74,20 @@ tosfs = TosFileSystem(
     endpoint_url=os.environ.get("TOS_ENDPOINT"),
     region=os.environ.get("TOS_REGION"),
     credentials_provider=EnvCredentialsProvider, # must
+)
+```
+
+* Init via assume role(temporary ak/sk and session token).
+
+make sure you have an assume role credential generator, then you can init the `TosFileSystem` like this:
+
+```python
+from tosfs import TosFileSystem
+from tosfs.certification import FileCredentialsProvider
+fs = TosFileSystem(
+    endpoint="http://tos-cn-beijing.volces.com",
+    region="cn-beijing",
+    credentials_provider=FileCredentialsProvider("/etc/secret/las"), # replace to real path
 )
 ```
 
