@@ -15,9 +15,10 @@
 """The module contains retry utility functions for the tosfs stability."""
 import math
 import time
-from typing import Any, Optional, Tuple
+from typing import Any, Optional, Tuple, Union
 
 import requests
+import urllib3.exceptions
 from requests import RequestException
 from requests.exceptions import (
     ChunkedEncodingError,
@@ -66,6 +67,7 @@ TOS_CLIENT_RETRYABLE_EXCEPTIONS = {
     Timeout,
     ConnectTimeout,
     ReadTimeout,
+    urllib3.exceptions.ReadTimeoutError,
     StreamConsumedError,
     RetryError,
     InterruptedError,
@@ -98,38 +100,42 @@ def retryable_func_executor(
         try:
             return func(*args, **kwargs)
         except TosError as e:
-            from tosfs.core import logger
-
-            if attempt >= max_retry_num:
-                logger.error("Retry exhausted after %d times.", max_retry_num)
-                raise e
-
-            if is_retryable_exception(e):
-                logger.warning(
-                    "Retry TOS request in the %d times, error: %s", attempt, e
-                )
-                try:
-                    sleep_time = _get_sleep_time(e, attempt)
-                    time.sleep(sleep_time)
-                except InterruptedError as ie:
-                    raise TosfsError(f"Request {func} interrupted.") from ie
-            else:
-                _rethrow_retryable_exception(e)
-        # Note: maybe not all the retryable exceptions are warped by `TosError`
-        # Will pay attention to those cases
+            _do_retry(e, func, attempt, max_retry_num)
         except Exception as e:
-            raise TosfsError(f"{e}") from e
+            _do_retry(e, func, attempt, max_retry_num)
 
 
-def _rethrow_retryable_exception(e: TosError) -> None:
+def _do_retry(
+    e: Union[TosError, Exception], func: Any, attempt: int, max_retry_num: int
+) -> None:
+    from tosfs.core import logger
+
+    if attempt >= max_retry_num:
+        logger.error("Retry exhausted after %d times.", max_retry_num)
+        raise e
+
+    if is_retryable_exception(e):
+        logger.warning("Retry TOS request in the %d times, error: %s", attempt, e)
+        try:
+            sleep_time = _get_sleep_time(e, attempt)
+            time.sleep(sleep_time)
+        except InterruptedError as ie:
+            raise TosfsError(f"Request {func} interrupted.") from ie
+    else:
+        _rethrow_retryable_exception(e)
+
+
+def _rethrow_retryable_exception(e: Union[Exception, TosError]) -> None:
     """For debug purpose."""
     raise e
 
 
 def is_retryable_exception(e: TosError) -> bool:
     """Check if the exception is retryable."""
-    return _is_retryable_tos_server_exception(e) or _is_retryable_tos_client_exception(
-        e
+    return (
+        _is_retryable_tos_server_exception(e)
+        or _is_retryable_tos_client_exception(e)
+        or _is_retryable_general_client_exception(e)
     )
 
 
@@ -159,6 +165,15 @@ def _is_retryable_tos_client_exception(e: TosError) -> bool:
                 if isinstance(cause, excp):
                     return True
             cause = getattr(cause, "cause", None)
+    return False
+
+
+def _is_retryable_general_client_exception(e: Optional[Exception]) -> bool:
+    while e is not None:
+        for excp in TOS_CLIENT_RETRYABLE_EXCEPTIONS:
+            if isinstance(e, excp):
+                return True
+        e = getattr(e, "cause", None)
     return False
 
 
