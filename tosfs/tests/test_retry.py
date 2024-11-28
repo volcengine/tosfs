@@ -18,7 +18,8 @@ import pytest
 import requests
 from tos.exceptions import TosClientError, TosServerError
 from tos.http import Response
-from urllib3.exceptions import ProtocolError
+from urllib3 import HTTPConnectionPool
+from urllib3.exceptions import ProtocolError, ReadTimeoutError
 
 from tosfs.retry import _get_sleep_time, is_retryable_exception
 
@@ -77,6 +78,16 @@ response = Response(mock_resp)
                     ),
                 ),
             ),
+            True,
+        ),
+        (
+            requests.exceptions.ConnectionError(
+                HTTPConnectionPool(host="proton-ci.tos-cn-beijing.volces.com", port=80)
+            ),
+            True,
+        ),
+        (
+            ReadTimeoutError(None, message="", url=""),
             True,
         ),
     ],
