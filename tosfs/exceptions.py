@@ -13,19 +13,27 @@
 # limitations under the License.
 
 """It contains exceptions definition for the tosfs package."""
+from typing import Optional
 
 
 class TosfsError(Exception):
     """Base class for all tosfs exceptions."""
 
-    def __init__(self, message: str):
+    def __init__(self, msg: str, cause: Optional[Exception] = None):
         """Initialize the base class for all exceptions in the tosfs package."""
-        super().__init__(message)
+        super().__init__(msg, cause)
+        self.message = msg
+        self.cause = cause
+
+    def __str__(self) -> str:
+        """Return the string representation of the exception."""
+        error = {"message": self.message, "case": str(self.cause)}
+        return str(error)
 
 
 class TosfsCertificationError(TosfsError):
     """Exception class for certification related exception."""
 
-    def __init__(self, message: str):
+    def __init__(self, message: str, cause: Optional[Exception] = None):
         """Initialize the exception class for certification related exception."""
-        super().__init__(message)
+        super().__init__(message, cause)
