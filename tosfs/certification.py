@@ -236,3 +236,58 @@ class UrlCredentialsProvider(CredentialsProvider):
         ):
             return None
         return self.credentials
+
+
+class NoLockUrlCredentialsProvider(CredentialsProvider):
+    """The class provides the credentials from an url.
+
+    It does not use lock to protect the credentials.
+    Due to threading.Lock is not serializable,
+    it can not be used in Ray remote function.
+    """
+
+    def __init__(self, credential_url: str):
+        """Initialize the UrlCredentialsProvider."""
+        if not credential_url:
+            raise TosfsCertificationError("The credential_url param must not be empty.")
+        self.expires: Optional[datetime] = None
+        self.credentials = None
+        self.credential_url = credential_url
+
+    def get_credentials(self) -> Credentials:
+        """Get the credentials from the url."""
+        res = self._try_get_credentials()
+        if res is not None:
+            return res
+        try:
+            res = self._try_get_credentials()
+            if res is not None:
+                return res
+
+            res = requests.get(self.credential_url, timeout=30)
+            res_body = res.json()
+            self.credentials = Credentials(
+                res_body.get("AccessKeyId"),
+                res_body.get("SecretAccessKey"),
+                res_body.get("SessionToken"),
+            )
+            self.expires = datetime.strptime(
+                res_body.get("ExpiredTime"), ECS_DATE_FORMAT
+            )
+            return self.credentials
+        except Exception as e:
+            if self.expires is not None and (
+                datetime.now().timestamp() < self.expires.timestamp()
+            ):
+                return self.credentials
+            raise TosfsCertificationError("Get token failed") from e
+
+    def _try_get_credentials(self) -> Optional[Credentials]:
+        if self.expires is None or self.credentials is None:
+            return None
+        if (
+            datetime.now().timestamp()
+            > (self.expires - timedelta(minutes=10)).timestamp()
+        ):
+            return None
+        return self.credentials
