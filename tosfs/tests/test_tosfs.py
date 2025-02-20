@@ -499,6 +499,52 @@ def test_put(tosfs: TosFileSystem, bucket: str, temporary_workspace: str):
             assert file.read() == "hello world"
 
 
+def test_get_recursive(tosfs: TosFileSystem, bucket: str, temporary_workspace: str):
+    lpath = create_temp_dir()
+
+    # key "/a/b" not exist "/a"
+    path = f"{bucket}/{temporary_workspace}/a/b"
+    bucket, key, _ = tosfs._split_path(path)
+    tosfs.tos_client.put_object(bucket=bucket, key=key, content="i am in file b")
+    assert tosfs.isfile(path)
+
+    # key "/a/aa/c/d" not exist "/a/aa/c"
+    path = f"{bucket}/{temporary_workspace}/a/aa/c/d"
+    bucket, key, _ = tosfs._split_path(path)
+    tosfs.tos_client.put_object(bucket=bucket, key=key, content="i am in file d")
+    assert tosfs.isfile(path)
+
+    rpath = "/".join([bucket, temporary_workspace])
+    tosfs.get(rpath, lpath, recursive=True)
+
+    # assert
+    file_b_path = os.path.join(lpath, "a", "b")
+    assert os.path.isfile(file_b_path), f"File {file_b_path} does not exist"
+    with open(file_b_path, "r") as f:
+        content = f.read()
+        assert (
+            content == "i am in file b"
+        ), f"Content of {file_b_path} is incorrect: {content}"
+
+    file_d_path = os.path.join(lpath, "a", "aa", "c", "d")
+    assert os.path.isfile(file_d_path), f"File {file_d_path} does not exist"
+    with open(file_d_path, "r") as f:
+        content = f.read()
+        assert (
+            content == "i am in file d"
+        ), f"Content of {file_d_path} is incorrect: {content}"
+
+    assert os.path.isdir(
+        os.path.join(lpath, "a")
+    ), f"Directory {os.path.join(lpath, 'a')} does not exist"
+    assert os.path.isdir(
+        os.path.join(lpath, "a", "aa")
+    ), f"Directory {os.path.join(lpath, 'a', 'b')} does not exist"
+    assert os.path.isdir(
+        os.path.join(lpath, "a", "aa", "c")
+    ), f"Directory {os.path.join(lpath, 'a', 'b', 'c')} does not exist"
+
+
 def test_get_file(tosfs: TosFileSystem, bucket: str, temporary_workspace: str) -> None:
     file_name = random_str()
     file_content = "hello world"
@@ -983,9 +1029,12 @@ def test_file_write_mpu_threshold_check(
     file_name = random_str()
     content = "a" * 1 * 1024
     block_size = 4 * 1024
-    with pytest.raises(ValueError, match="Block size must be >= 4MB."), tosfs.open(
-        f"{bucket}/{temporary_workspace}/{file_name}", "w", block_size=block_size
-    ) as f:
+    with (
+        pytest.raises(ValueError, match="Block size must be >= 4MB."),
+        tosfs.open(
+            f"{bucket}/{temporary_workspace}/{file_name}", "w", block_size=block_size
+        ) as f,
+    ):
         f.write(content)
 
 
