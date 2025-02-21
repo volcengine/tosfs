@@ -24,6 +24,7 @@ from typing import Any, BinaryIO, Collection, Generator, List, Optional, Tuple, 
 
 import tos
 from fsspec.spec import AbstractBufferedFile
+from fsspec.utils import other_paths
 from fsspec.utils import setup_logging as setup_logger
 from tos.auth import CredentialProviderAuth
 from tos.exceptions import TosClientError, TosServerError
@@ -1018,6 +1019,70 @@ class TosFileSystem(FsspecCompatibleFS):
                     max_retry_num=self.max_retry_num,
                 )
 
+    def get(
+        self,
+        rpath: str,
+        lpath: str,
+        recursive: bool = False,
+        callback: Any = None,
+        maxdepth: Optional[int] = None,
+        **kwargs: Any,
+    ) -> None:
+        """Copy file(s) to local.
+
+        Copies a specific file or tree of files (if recursive=True). If lpath
+        ends with a "/", it will be assumed to be a directory, and target files
+        will go within. Can submit a list of paths, which may be glob-patterns
+        and will be expanded.
+
+        Calls get_file for each source.
+        """
+        if isinstance(lpath, list) and isinstance(rpath, list):
+            # No need to expand paths when both source and destination
+            # are provided as lists
+            rpaths = rpath
+            lpaths = lpath
+        else:
+            from fsspec.implementations.local import (
+                LocalFileSystem,
+                make_path_posix,
+                trailing_sep,
+            )
+
+            # to make the exists check work
+            if self.isdir(rpath):
+                rpath = rpath.rstrip("/") + "/"
+
+            source_is_str = isinstance(rpath, str)
+            rpaths = self.expand_path(rpath, recursive=recursive, maxdepth=maxdepth)
+            if source_is_str and (not recursive or maxdepth is not None):
+                # Non-recursive glob does not copy directories
+                rpaths = [p for p in rpaths if not (trailing_sep(p) or self.isdir(p))]
+                if not rpaths:
+                    return
+
+            if isinstance(lpath, str):
+                lpath = make_path_posix(lpath)
+
+            source_is_file = len(rpaths) == 1
+            dest_is_dir = isinstance(lpath, str) and (
+                trailing_sep(lpath) or LocalFileSystem().isdir(lpath)
+            )
+
+            exists = source_is_str and (
+                (has_magic(rpath) and source_is_file)
+                or (not has_magic(rpath) and dest_is_dir and not trailing_sep(rpath))
+            )
+            lpaths = other_paths(
+                rpaths,
+                lpath,
+                exists=exists,
+                flatten=not source_is_str,
+            )
+
+            for lpath, rpath in zip(lpaths, rpaths):
+                self.get_file(rpath, lpath, callback=None, **kwargs)
+
     def get_file(self, rpath: str, lpath: str, **kwargs: Any) -> None:
         """Get a file from the TOS filesystem and write to a local path.
 
@@ -1050,6 +1115,10 @@ class TosFileSystem(FsspecCompatibleFS):
         if not self.exists(rpath):
             raise FileNotFoundError(rpath)
 
+        if self.isdir(rpath):
+            logger.debug("The remote path is a directory, skip downloading.")
+            return
+
         bucket, key, version_id = self._split_path(rpath)
 
         def _read_chunks(body: BinaryIO, f: BinaryIO) -> None:
@@ -1065,6 +1134,11 @@ class TosFileSystem(FsspecCompatibleFS):
             body, content_length = self._open_remote_file(
                 bucket, key, version_id, range_start=0, **kwargs
             )
+
+            dir_path = os.path.dirname(lpath)
+            if dir_path:
+                os.makedirs(dir_path, exist_ok=True)
+
             with open(lpath, "wb") as f:
                 retryable_func_executor(_read_chunks, args=(body, f))
 
@@ -1750,7 +1824,7 @@ class TosFileSystem(FsspecCompatibleFS):
         range_start: int,
         **kwargs: Any,
     ) -> Tuple[BinaryIO, int]:
-        if kwargs.get("callback") is not None:
+        if "callback" in kwargs:
             kwargs.pop("callback")
         try:
             resp = retryable_func_executor(
